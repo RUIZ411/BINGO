@@ -1,19 +1,20 @@
-# BKG Bingo V1
+# BKG Bingo V1 - Pastel Readable Layout
 
-방송용 빙고 사이트 V1입니다.
+방송용 빙고 사이트 V1 파스텔 디자인 수정본입니다.
 
-## 포함 기능
+## 이번 수정 사항
 
-- 5×5 / 7×7 / 10×10 빙고판 생성
-- 숫자 / 알파벳 / 미션 타입 생성
-- 관리자 화면에서 칸 내용 수정
-- 칸 지움/복구
-- 빙고 수 자동 계산
-- 🍗 치킨 카운트 수동 조절
-- 빙고 완성 시 BINGO 효과 + 줄 긋기 효과
-- 공개 화면, OBS 화면, 관리자 화면 분리
-- Firebase Realtime Database 연동 가능
-- Firebase 미설정 시 localStorage 데모 모드
+- 빙고 제목을 상단 탭 영역이 아니라 빙고판 바로 위에 표시
+- 빙고 수와 치킨 수를 빙고판 아래에 표시
+- MAX 배지 숨김 처리
+- 긴 미션 문구가 덜 잘리도록 글자 수에 따라 폰트 크기 자동 조절
+- 100px × 100px 칸 크기 유지
+- 파스텔 박스형 디자인 유지
+- 관리자 패널 접기/펼치기 유지
+- OBS 화면은 투명 배경 기반으로 제목 → 빙고판 → 카운터 순서 유지
+- Firebase Realtime Database URL 적용 완료
+- @suweet.com 자동 추가 로그인 유지
+- 세션 로그인 유지
 
 ## 화면 주소
 
@@ -21,23 +22,16 @@
 - OBS 화면: `index.html?view=obs`
 - 관리자 화면: `index.html?view=admin`
 
-## Firebase 적용 방법
+## GitHub 적용 방법
 
-1. Firebase 콘솔에서 프로젝트를 만듭니다.
-2. Web App을 추가합니다.
-3. Realtime Database를 생성합니다.
-4. Authentication > Email/Password 로그인을 활성화합니다.
-5. 관리자 계정을 하나 생성합니다.
-6. `app.js` 상단의 `firebaseConfig` 값을 Firebase 콘솔의 설정값으로 교체합니다.
-7. Realtime Database Rules에 `firebase.rules.json` 내용을 적용합니다.
+ZIP 파일을 그대로 올리지 말고 압축을 푼 뒤 아래 파일들을 기존 파일 위치에 덮어씌우세요.
 
-## 로컬 데모 모드
-
-`app.js`의 `firebaseConfig`가 비어 있으면 브라우저 localStorage로만 동작합니다.
-관리자 PIN 기본값은 `1234`입니다.
-
-```js
-const LOCAL_ADMIN_PIN = "1234";
+```txt
+index.html
+style.css
+app.js
+README.md
+firebase.rules.json
 ```
 
-실제 방송용으로 사용할 때는 Firebase Auth를 쓰는 것을 권장합니다.
+업로드 후 GitHub Pages 반영이 늦으면 `Ctrl + F5`로 강력 새로고침하세요.

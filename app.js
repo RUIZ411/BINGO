@@ -55,6 +55,7 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 const els = {
   pageTitle: $("#pageTitle"),
+  boardTitle: $("#boardTitle"),
   topbar: $("#topbar"),
   adminPanel: $("#adminPanel"),
   adminToggleRow: $("#adminToggleRow"),
@@ -325,7 +326,8 @@ function updateChicken(delta) {
 function render() {
   currentState = normalizeState(currentState);
 
-  els.pageTitle.textContent = currentState.title;
+  els.pageTitle.textContent = getViewTitle();
+  els.boardTitle.textContent = currentState.title;
   els.titleInput.value = currentState.title;
   els.sizeSelect.value = String(currentState.size);
   els.typeSelect.value = currentState.contentType;
@@ -340,6 +342,20 @@ function render() {
   renderBoard();
   renderLines();
   maybePlayBingoEffect();
+}
+
+function getViewTitle() {
+  if (activeView === "admin") return "관리자 화면";
+  if (activeView === "obs") return "OBS 화면";
+  return "빙고 화면";
+}
+
+function getTextLengthClass(value) {
+  const length = Array.from(String(value || "").replace(/\s+/g, "")).length;
+  if (length <= 4) return "text-short";
+  if (length <= 8) return "text-medium";
+  if (length <= 13) return "text-long";
+  return "text-xlong";
 }
 
 function renderAdminLock() {
@@ -377,14 +393,14 @@ function renderBoard() {
 
   currentState.cells.forEach((cell, index) => {
     const cellEl = document.createElement("div");
-    cellEl.className = "cell";
+    cellEl.className = `cell ${getTextLengthClass(cell.text)}`;
     cellEl.dataset.index = String(index);
     cellEl.classList.toggle("cleared", Boolean(cell.cleared));
     cellEl.classList.toggle("line-completed", completedCellIndexes.has(index));
 
     if (activeView === "admin" && isAdmin) {
       const textarea = document.createElement("textarea");
-      textarea.className = "admin-cell-editor";
+      textarea.className = `admin-cell-editor ${getTextLengthClass(cell.text)}`;
       textarea.value = cell.text;
       textarea.maxLength = 80;
       textarea.addEventListener("input", () => scheduleCellTextSave(index, textarea.value));

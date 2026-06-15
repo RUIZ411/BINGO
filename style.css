@@ -636,3 +636,190 @@ body.view-admin .stage { position: sticky; top: 16px; }
   .score-box strong { font-size: 25px; }
   .two-col { grid-template-columns: 1fr; }
 }
+
+/* Readable layout hotfix: board title above, score below, softer Korean typography */
+:root {
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+h1 {
+  font-size: clamp(22px, 2.6vw, 34px);
+  letter-spacing: -0.04em;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.board-title-card {
+  width: min(760px, 100%);
+  margin: 0 auto 18px;
+  padding: 18px 24px 16px;
+  text-align: center;
+  border-radius: 28px;
+  border: 2px solid rgba(255,255,255,.86);
+  background: rgba(255,255,255,.76);
+  box-shadow: 0 16px 38px rgba(178,116,158,.13), inset 0 -3px 0 rgba(255,159,199,.09);
+}
+
+.board-title-eyebrow {
+  margin: 0 0 6px;
+  color: #c28bad;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .16em;
+}
+
+.board-title-card h2 {
+  margin: 0;
+  color: #5b4562;
+  font-size: clamp(28px, 3.2vw, 46px);
+  line-height: 1.12;
+  font-weight: 1000;
+  letter-spacing: -0.055em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.board-wrap {
+  width: 100%;
+  padding: 0 4px 12px;
+}
+
+.score-strip {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+#maxBingoBox {
+  display: none !important;
+}
+
+.score-box {
+  min-width: 152px;
+  min-height: 66px;
+  border-radius: 24px;
+}
+
+.score-label {
+  font-size: 13px;
+}
+
+.score-box strong {
+  font-size: 34px;
+}
+
+.cell {
+  padding: 7px;
+  border-radius: 21px;
+}
+
+.cell-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  max-height: 86px;
+  padding: 0 5px;
+  overflow: hidden;
+  color: #59425b;
+  font-weight: 950;
+  letter-spacing: -0.065em;
+  line-height: 1.08;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.cell.text-short .cell-text {
+  font-size: 24px;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+}
+
+.cell.text-medium .cell-text {
+  font-size: 20px;
+}
+
+.cell.text-long .cell-text {
+  font-size: 16px;
+  -webkit-line-clamp: 5;
+}
+
+.cell.text-xlong .cell-text {
+  font-size: 13px;
+  line-height: 1.05;
+  -webkit-line-clamp: 6;
+  max-height: 88px;
+}
+
+.admin-cell-editor {
+  height: 66px;
+  padding: 7px 6px;
+  font-size: 14px;
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.admin-cell-editor.text-short {
+  font-size: 17px;
+}
+
+.admin-cell-editor.text-medium {
+  font-size: 15px;
+}
+
+.admin-cell-editor.text-long,
+.admin-cell-editor.text-xlong {
+  font-size: 12px;
+  line-height: 1.05;
+}
+
+.cell-actions {
+  margin-top: 4px;
+}
+
+.cell-mini-btn {
+  padding: 4px 9px;
+  font-size: 10px;
+}
+
+body.view-obs .board-title-card {
+  width: max-content;
+  min-width: min(520px, calc(100vw - 24px));
+  margin-bottom: 12px;
+  padding: 12px 20px;
+  background: rgba(255,255,255,.82);
+  box-shadow: 0 12px 30px rgba(178,116,158,.16);
+}
+
+body.view-obs .board-title-card h2 {
+  font-size: clamp(24px, 4vw, 38px);
+}
+
+body.view-obs .score-strip {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .board-title-card {
+    padding: 14px 16px 13px;
+    border-radius: 22px;
+  }
+
+  .board-title-card h2 {
+    font-size: 27px;
+  }
+
+  .score-strip {
+    margin-top: 12px;
+  }
+
+  .score-box {
+    min-width: 118px;
+    min-height: 56px;
+  }
+}

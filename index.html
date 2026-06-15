@@ -13,7 +13,7 @@
         <span class="brand-mark">B</span>
         <div>
           <p class="eyebrow">BKG BINGO</p>
-          <h1 id="pageTitle">오늘의 빙고</h1>
+          <h1 id="pageTitle">빙고 화면</h1>
         </div>
       </div>
 
@@ -136,19 +136,9 @@
       </aside>
 
       <section class="stage" id="stage">
-        <div class="score-strip">
-          <div class="score-box">
-            <span class="score-label">BINGO</span>
-            <strong id="bingoCount">0</strong>
-          </div>
-          <div class="score-box chicken-box">
-            <span class="score-label">🍗</span>
-            <strong id="chickenCount">0</strong>
-          </div>
-          <div class="score-box small-score" id="maxBingoBox">
-            <span class="score-label">MAX</span>
-            <strong id="maxBingoCount">12</strong>
-          </div>
+        <div class="board-title-card">
+          <p class="board-title-eyebrow">TODAY BINGO</p>
+          <h2 id="boardTitle">오늘의 빙고</h2>
         </div>
 
         <div class="board-wrap" id="boardWrap">
@@ -158,6 +148,21 @@
             <div id="bingoOverlay" class="bingo-overlay" hidden>
               <span>BINGO!</span>
             </div>
+          </div>
+        </div>
+
+        <div class="score-strip">
+          <div class="score-box">
+            <span class="score-label">BINGO</span>
+            <strong id="bingoCount">0</strong>
+          </div>
+          <div class="score-box chicken-box">
+            <span class="score-label">🍗</span>
+            <strong id="chickenCount">0</strong>
+          </div>
+          <div class="score-box small-score" id="maxBingoBox" hidden>
+            <span class="score-label">MAX</span>
+            <strong id="maxBingoCount">12</strong>
           </div>
         </div>
 
