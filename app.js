@@ -10,7 +10,9 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  setPersistence,
+  browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /*
@@ -182,6 +184,7 @@ if (!email) {
   return;
 }
 
+await setPersistence(auth, browserSessionPersistence);
 await signInWithEmailAndPassword(auth, email, els.adminPassword.value);
     } catch (error) {
       alert(`로그인 실패: ${error.message}`);
