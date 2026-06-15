@@ -898,3 +898,77 @@ body.view-public .editor-help {
     padding-right: 0;
   }
 }
+
+
+/* Split layout hotfix: title above board, score below board, reliable grid rendering */
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.board-title-block {
+  width: min(760px, 100%);
+  margin: 0 auto 18px;
+  padding: 18px 24px 16px;
+  text-align: center;
+  border-radius: 28px;
+  border: 2px solid rgba(255,255,255,.86);
+  background: rgba(255,255,255,.76);
+  box-shadow: 0 16px 38px rgba(178,116,158,.13), inset 0 -3px 0 rgba(255,159,199,.09);
+}
+
+.board-kicker {
+  margin: 0 0 6px;
+  color: #c28bad;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .16em;
+}
+
+.board-title-block h2 {
+  margin: 0;
+  color: #5b4562;
+  font-size: clamp(28px, 3.2vw, 46px);
+  line-height: 1.12;
+  font-weight: 1000;
+  letter-spacing: -0.055em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.bingo-board {
+  display: grid !important;
+  grid-template-columns: repeat(var(--cell-size), 100px) !important;
+  grid-template-rows: repeat(var(--cell-size), 100px) !important;
+}
+
+.score-strip {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+#maxBingoBox {
+  display: none !important;
+}
+
+body.view-public .stage {
+  justify-content: flex-start;
+}
+
+body.view-public .board-title-block {
+  margin-top: 6px;
+}
+
+body.view-obs .board-title-block {
+  width: max-content;
+  min-width: min(520px, calc(100vw - 24px));
+  margin-bottom: 12px;
+  padding: 12px 20px;
+  background: rgba(255,255,255,.82);
+  box-shadow: 0 12px 30px rgba(178,116,158,.16);
+}
+
+body.view-obs .board-title-block h2 {
+  font-size: clamp(24px, 4vw, 38px);
+}

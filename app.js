@@ -326,17 +326,17 @@ function updateChicken(delta) {
 function render() {
   currentState = normalizeState(currentState);
 
-  els.pageTitle.textContent = getViewTitle();
-  els.boardTitle.textContent = currentState.title;
-  els.titleInput.value = currentState.title;
-  els.sizeSelect.value = String(currentState.size);
-  els.typeSelect.value = currentState.contentType;
-  els.chickenInput.value = String(currentState.chickenCount);
-  els.chickenPreview.textContent = currentState.chickenCount;
-  els.bingoCount.textContent = currentState.bingoCount;
-  els.chickenCount.textContent = currentState.chickenCount;
-  els.maxBingoCount.textContent = currentState.size * 2 + 2;
-  els.bingoBoard.style.setProperty("--cell-size", currentState.size);
+  if (els.pageTitle) els.pageTitle.textContent = getViewTitle();
+  if (els.boardTitle) els.boardTitle.textContent = currentState.title;
+  if (els.titleInput) els.titleInput.value = currentState.title;
+  if (els.sizeSelect) els.sizeSelect.value = String(currentState.size);
+  if (els.typeSelect) els.typeSelect.value = currentState.contentType;
+  if (els.chickenInput) els.chickenInput.value = String(currentState.chickenCount);
+  if (els.chickenPreview) els.chickenPreview.textContent = currentState.chickenCount;
+  if (els.bingoCount) els.bingoCount.textContent = currentState.bingoCount;
+  if (els.chickenCount) els.chickenCount.textContent = currentState.chickenCount;
+  if (els.maxBingoCount) els.maxBingoCount.textContent = currentState.size * 2 + 2;
+  if (els.bingoBoard) els.bingoBoard.style.setProperty("--cell-size", currentState.size);
 
   renderAdminLock();
   renderBoard();
@@ -385,6 +385,7 @@ function renderAdminLock() {
 }
 
 function renderBoard() {
+  if (!els.bingoBoard) return;
   els.bingoBoard.innerHTML = "";
   const completedCellIndexes = new Set(
     Object.values(currentState.completedLines || {}).flatMap((line) => line.cells)
@@ -413,6 +414,7 @@ function renderBoard() {
 }
 
 function renderLines() {
+  if (!els.lineLayer) return;
   els.lineLayer.innerHTML = "";
   const lines = Object.values(currentState.completedLines || {});
   const newLineIds = new Set(currentState.lastNewLines || []);
@@ -435,6 +437,7 @@ function maybePlayBingoEffect() {
   if (!hasNewLine) return;
 
   lastRenderedEffectNonce = currentState.effectNonce;
+  if (!els.bingoOverlay) return;
   els.bingoOverlay.hidden = false;
   els.bingoOverlay.style.animation = "none";
   void els.bingoOverlay.offsetWidth;
