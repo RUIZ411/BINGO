@@ -41,20 +41,3 @@ const LOCAL_ADMIN_PIN = "1234";
 ```
 
 실제 방송용으로 사용할 때는 Firebase Auth를 쓰는 것을 권장합니다.
-
-
-## Firebase 설정값 적용 완료 안내
-
-이 버전의 `app.js`에는 사용자가 제공한 Firebase Web App 설정값이 미리 들어가 있습니다.
-다만 Realtime Database 연동을 켜려면 `databaseURL` 값이 추가로 필요합니다.
-
-Firebase Console > Realtime Database에서 데이터베이스를 생성한 뒤, 표시되는 URL을 `app.js`의 `databaseURL`에 붙여넣으세요.
-
-예시 형식:
-
-```js
-databaseURL: "https://bingo-d4a00-default-rtdb.asia-southeast1.firebasedatabase.app"
-```
-
-위 URL은 예시이므로 콘솔에 표시되는 실제 URL을 사용해야 합니다.
-`databaseURL`이 비어 있으면 사이트는 기존처럼 localStorage 데모 모드로 실행됩니다.

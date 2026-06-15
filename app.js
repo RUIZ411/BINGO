@@ -37,6 +37,7 @@ const LOCAL_STORAGE_KEY = "bkg-bingo-v1-state";
 const LOCAL_ADMIN_PIN = "1234";
 const ADMIN_EMAIL_DOMAIN = "@suweet.com";
 
+
 const stateDefaults = {
   title: "오늘의 빙고",
   size: 5,
@@ -56,6 +57,8 @@ const els = {
   pageTitle: $("#pageTitle"),
   topbar: $("#topbar"),
   adminPanel: $("#adminPanel"),
+  adminToggleRow: $("#adminToggleRow"),
+  adminToggle: $("#adminToggle"),
   loginStatus: $("#loginStatus"),
   firebaseLoginBox: $("#firebaseLoginBox"),
   localLoginBox: $("#localLoginBox"),
@@ -124,6 +127,7 @@ function setupView() {
 
   if (activeView === "admin") {
     els.adminPanel.hidden = false;
+    els.adminToggleRow.hidden = false;
     els.cellEditorHelp.hidden = false;
   }
 }
@@ -154,18 +158,27 @@ function setupFirebaseIfAvailable() {
     if (!snapshot.exists()) return;
     currentState = normalizeState(snapshot.val());
     render();
+  }, (error) => {
+    console.error("Firebase 실시간 수신 실패", error);
+    setLoginStatus("DB 연결 오류", "warn");
   });
 }
 
 async function loadInitialState() {
   if (isFirebaseEnabled) {
-    const snapshot = await get(roomRef);
-    if (snapshot.exists()) {
-      currentState = normalizeState(snapshot.val());
-    } else {
+    try {
+      const snapshot = await get(roomRef);
+      if (snapshot.exists()) {
+        currentState = normalizeState(snapshot.val());
+      } else {
+        currentState = makeInitialState();
+        // 방이 없을 때는 로그인한 관리자만 생성 가능. 미로그인 상태면 화면에 기본값만 표시됩니다.
+        if (auth.currentUser) await saveWholeState(currentState);
+      }
+    } catch (error) {
+      console.error("Firebase DB 초기 불러오기 실패", error);
       currentState = makeInitialState();
-      // 방이 없을 때는 로그인한 관리자만 생성 가능. 미로그인 상태면 화면에 기본값만 표시됩니다.
-      if (auth.currentUser) await saveWholeState(currentState);
+      setLoginStatus("DB 연결 오류", "warn");
     }
     return;
   }
@@ -175,17 +188,20 @@ async function loadInitialState() {
 }
 
 function bindEvents() {
+  els.adminToggle?.addEventListener("click", () => {
+    const collapsed = document.body.classList.toggle("admin-collapsed");
+    els.adminToggle.textContent = collapsed ? "관리자 패널 열기" : "관리자 패널 접기";
+  });
+
   els.loginBtn?.addEventListener("click", async () => {
     try {
       const email = makeLoginEmail(els.adminEmail.value);
-
-if (!email) {
-  alert("아이디를 입력해 주세요.");
-  return;
-}
-
-await setPersistence(auth, browserSessionPersistence);
-await signInWithEmailAndPassword(auth, email, els.adminPassword.value);
+      if (!email) {
+        alert("아이디를 입력해 주세요.");
+        return;
+      }
+      await setPersistence(auth, browserSessionPersistence);
+      await signInWithEmailAndPassword(auth, email, els.adminPassword.value);
     } catch (error) {
       alert(`로그인 실패: ${error.message}`);
     }
@@ -292,6 +308,12 @@ await signInWithEmailAndPassword(auth, email, els.adminPassword.value);
       Object.assign(draft, fresh);
     });
   });
+}
+
+function makeLoginEmail(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.includes("@") ? raw : `${raw}${ADMIN_EMAIL_DOMAIN}`;
 }
 
 function updateChicken(delta) {
@@ -456,18 +478,25 @@ async function commitState(mutator) {
 async function saveWholeState(nextState) {
   currentState = normalizeState(nextState);
 
+  // Firebase 저장이 실패하더라도 화면에서 버튼 반응이 바로 보이도록 먼저 렌더링합니다.
+  render();
+
   if (isFirebaseEnabled) {
     if (!auth.currentUser) {
-      render();
       alert("Firebase 모드에서는 관리자 로그인 후 저장할 수 있습니다.");
       return;
     }
-    await set(roomRef, currentState);
+
+    try {
+      await set(roomRef, currentState);
+    } catch (error) {
+      console.error("Firebase 저장 실패", error);
+      alert("Firebase 저장에 실패했습니다. Realtime Database URL, Database 생성 여부, Rules 권한을 확인해 주세요. 화면에는 임시로 반영됐지만 새로고침하면 사라질 수 있습니다.");
+    }
     return;
   }
 
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentState));
-  render();
 }
 
 function makeInitialState() {
@@ -606,10 +635,4 @@ function setLoginStatus(text, mode) {
   els.loginStatus.textContent = text;
   els.loginStatus.classList.remove("ok", "warn");
   if (mode) els.loginStatus.classList.add(mode);
-}
-
-function makeLoginEmail(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  return raw.includes("@") ? raw : `${raw}${ADMIN_EMAIL_DOMAIN}`;
 }
