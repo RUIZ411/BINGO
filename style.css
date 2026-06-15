@@ -972,3 +972,58 @@ body.view-obs .board-title-block {
 body.view-obs .board-title-block h2 {
   font-size: clamp(24px, 4vw, 38px);
 }
+
+/* Number draw controls */
+.number-draw-panel {
+  position: relative;
+}
+
+.draw-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 950;
+  background: rgba(255, 238, 246, .92);
+  color: #a7799d;
+}
+
+.draw-preview b {
+  color: #df8b2e;
+  font-size: 15px;
+}
+
+.draw-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.draw-info-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 64px;
+  justify-content: center;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 159, 199, .32);
+  background: rgba(255,255,255,.68);
+  box-shadow: inset 0 -3px 0 rgba(255,159,199,.07);
+}
+
+.draw-info-box span {
+  color: #b57ca2;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .04em;
+}
+
+.draw-info-box strong {
+  color: #5b4562;
+  font-size: 24px;
+  line-height: 1;
+}

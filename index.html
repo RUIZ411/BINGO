@@ -99,6 +99,30 @@
           </div>
         </section>
 
+
+
+        <section class="panel-card admin-only number-draw-panel" data-admin-only>
+          <div class="panel-head">
+            <h2>숫자 랜덤 추첨</h2>
+            <span class="draw-preview">🎲 <b id="lastDrawnNumber">-</b></span>
+          </div>
+          <div class="draw-info-grid">
+            <div class="draw-info-box">
+              <span>추첨됨</span>
+              <strong id="drawnCount">0</strong>
+            </div>
+            <div class="draw-info-box">
+              <span>남은 숫자</span>
+              <strong id="remainingDrawCount">100</strong>
+            </div>
+          </div>
+          <div class="row-buttons wrap">
+            <button id="numberDrawBtn" class="primary-btn">1~100 숫자 추첨</button>
+            <button id="resetDrawBtn" class="ghost-btn">추첨 기록 초기화</button>
+          </div>
+          <p id="drawResultText" class="help-text">내용 타입이 숫자일 때 사용할 수 있어요.</p>
+        </section>
+
         <section class="panel-card admin-only" data-admin-only>
           <div class="panel-head">
             <h2>치킨 수</h2>

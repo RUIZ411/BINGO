@@ -47,6 +47,9 @@ const stateDefaults = {
   completedLines: {},
   effectNonce: 0,
   lastNewLines: [],
+  drawnNumbers: [],
+  lastDrawnNumber: null,
+  lastDrawMatched: false,
   cells: []
 };
 
@@ -76,6 +79,12 @@ const els = {
   createBoardBtn: $("#createBoardBtn"),
   shuffleBtn: $("#shuffleBtn"),
   resetChecksBtn: $("#resetChecksBtn"),
+  numberDrawBtn: $("#numberDrawBtn"),
+  resetDrawBtn: $("#resetDrawBtn"),
+  lastDrawnNumber: $("#lastDrawnNumber"),
+  drawnCount: $("#drawnCount"),
+  remainingDrawCount: $("#remainingDrawCount"),
+  drawResultText: $("#drawResultText"),
   chickenPreview: $("#chickenPreview"),
   chickenInput: $("#chickenInput"),
   chickenMinusBtn: $("#chickenMinusBtn"),
@@ -239,6 +248,10 @@ function bindEvents() {
     }, 350);
   });
 
+  els.typeSelect.addEventListener("change", () => {
+    updateNumberDrawControls();
+  });
+
   els.createBoardBtn.addEventListener("click", () => {
     const size = Number(els.sizeSelect.value);
     const contentType = els.typeSelect.value;
@@ -248,6 +261,9 @@ function bindEvents() {
       draft.cells = buildCells(size, contentType);
       draft.completedLines = {};
       draft.bingoCount = 0;
+      draft.drawnNumbers = [];
+      draft.lastDrawnNumber = null;
+      draft.lastDrawMatched = false;
       draft.effectNonce += 1;
       draft.lastNewLines = [];
     });
@@ -257,6 +273,11 @@ function bindEvents() {
     commitState((draft) => {
       const texts = shuffleArray(draft.cells.map((cell) => cell.text));
       draft.cells = draft.cells.map((cell, index) => ({ ...cell, text: texts[index] }));
+      if (draft.contentType === "number") {
+        draft.drawnNumbers = [];
+        draft.lastDrawnNumber = null;
+        draft.lastDrawMatched = false;
+      }
     });
   });
 
@@ -265,10 +286,16 @@ function bindEvents() {
       draft.cells = draft.cells.map((cell) => ({ ...cell, cleared: false }));
       draft.completedLines = {};
       draft.bingoCount = 0;
+      draft.drawnNumbers = [];
+      draft.lastDrawnNumber = null;
+      draft.lastDrawMatched = false;
       draft.lastNewLines = [];
       draft.effectNonce += 1;
     });
   });
+
+  els.numberDrawBtn?.addEventListener("click", drawRandomNumber);
+  els.resetDrawBtn?.addEventListener("click", resetNumberDrawHistory);
 
   els.chickenMinusBtn.addEventListener("click", () => updateChicken(-1));
   els.chickenPlusBtn.addEventListener("click", () => updateChicken(1));
@@ -323,6 +350,87 @@ function updateChicken(delta) {
   });
 }
 
+function updateNumberDrawControls() {
+  const selectedType = els.typeSelect?.value || currentState.contentType;
+  const isNumberMode = currentState.contentType === "number" || selectedType === "number";
+  const drawn = normalizeDrawnNumbers(currentState.drawnNumbers);
+  const remaining = Math.max(0, 100 - drawn.length);
+
+  if (els.lastDrawnNumber) els.lastDrawnNumber.textContent = currentState.lastDrawnNumber ?? "-";
+  if (els.drawnCount) els.drawnCount.textContent = String(drawn.length);
+  if (els.remainingDrawCount) els.remainingDrawCount.textContent = String(remaining);
+
+  if (els.numberDrawBtn) {
+    els.numberDrawBtn.disabled = !isAdmin || activeView === "obs" || currentState.contentType !== "number" || remaining <= 0;
+  }
+  if (els.resetDrawBtn) {
+    els.resetDrawBtn.disabled = !isAdmin || activeView === "obs" || currentState.contentType !== "number" || drawn.length === 0;
+  }
+
+  if (!els.drawResultText) return;
+  if (currentState.contentType !== "number") {
+    els.drawResultText.textContent = selectedType === "number"
+      ? "빙고판 생성을 누르면 1~100 숫자판과 추첨 버튼을 사용할 수 있어요."
+      : "내용 타입이 숫자일 때 사용할 수 있어요.";
+    return;
+  }
+
+  if (currentState.lastDrawnNumber == null) {
+    els.drawResultText.textContent = "1~100 중 중복 없이 추첨하고, 빙고판에 있는 숫자는 자동으로 지워져요.";
+    return;
+  }
+
+  els.drawResultText.textContent = currentState.lastDrawMatched
+    ? `${currentState.lastDrawnNumber}번 추첨! 빙고판의 같은 숫자를 지웠어요.`
+    : `${currentState.lastDrawnNumber}번 추첨! 현재 빙고판에는 없는 숫자예요.`;
+}
+
+function drawRandomNumber() {
+  if (currentState.contentType !== "number") {
+    alert("숫자 타입 빙고판에서만 사용할 수 있습니다.");
+    return;
+  }
+
+  commitState((draft) => {
+    const drawn = new Set(normalizeDrawnNumbers(draft.drawnNumbers));
+    if (drawn.size >= 100) {
+      alert("1~100 숫자를 모두 추첨했습니다.");
+      return;
+    }
+
+    const pool = Array.from({ length: 100 }, (_, index) => index + 1).filter((number) => !drawn.has(number));
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    drawn.add(picked);
+
+    const matchedCell = draft.cells.find((cell) => String(cell.text).trim() === String(picked));
+    if (matchedCell) matchedCell.cleared = true;
+
+    draft.drawnNumbers = Array.from(drawn);
+    draft.lastDrawnNumber = picked;
+    draft.lastDrawMatched = Boolean(matchedCell);
+  });
+}
+
+function resetNumberDrawHistory() {
+  commitState((draft) => {
+    draft.drawnNumbers = [];
+    draft.lastDrawnNumber = null;
+    draft.lastDrawMatched = false;
+  });
+}
+
+function normalizeDrawnNumbers(value) {
+  return Array.from(new Set((Array.isArray(value) ? value : [])
+    .map((number) => Number(number))
+    .filter((number) => Number.isInteger(number) && number >= 1 && number <= 100)));
+}
+
+function normalizeLastDrawnNumber(value) {
+  if (value == null) return null;
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 1 && number <= 100 ? number : null;
+}
+
 function render() {
   currentState = normalizeState(currentState);
 
@@ -339,6 +447,7 @@ function render() {
   if (els.bingoBoard) els.bingoBoard.style.setProperty("--cell-size", currentState.size);
 
   renderAdminLock();
+  updateNumberDrawControls();
   renderBoard();
   renderLines();
   maybePlayBingoEffect();
@@ -372,6 +481,8 @@ function renderAdminLock() {
     els.createBoardBtn,
     els.shuffleBtn,
     els.resetChecksBtn,
+    els.numberDrawBtn,
+    els.resetDrawBtn,
     els.chickenInput,
     els.chickenMinusBtn,
     els.chickenPlusBtn,
@@ -531,16 +642,21 @@ function normalizeState(raw) {
     chickenCount: Math.max(0, Number(raw?.chickenCount || 0)),
     effectNonce: Number(raw?.effectNonce || 0),
     lastNewLines: Array.isArray(raw?.lastNewLines) ? raw.lastNewLines : [],
+    drawnNumbers: normalizeDrawnNumbers(raw?.drawnNumbers),
+    lastDrawnNumber: normalizeLastDrawnNumber(raw?.lastDrawnNumber),
+    lastDrawMatched: Boolean(raw?.lastDrawMatched),
     cells
   }, raw?.completedLines || {});
 }
 
 function buildCells(size, contentType) {
   const count = size * size;
+  const numberTexts = contentType === "number" ? makeRandomNumberTexts(count) : null;
+
   return Array.from({ length: count }, (_, index) => ({
     id: `cell_${index}`,
     index,
-    text: makeCellText(index, contentType),
+    text: numberTexts ? numberTexts[index] : makeCellText(index, contentType),
     cleared: false
   }));
 }
@@ -549,6 +665,10 @@ function makeCellText(index, contentType) {
   if (contentType === "number") return String(index + 1);
   if (contentType === "alphabet") return excelColumnName(index + 1);
   return `미션 ${index + 1}`;
+}
+
+function makeRandomNumberTexts(count) {
+  return shuffleArray(Array.from({ length: 100 }, (_, index) => String(index + 1))).slice(0, count);
 }
 
 function excelColumnName(number) {
