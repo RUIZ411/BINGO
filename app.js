@@ -22,7 +22,7 @@ const firebaseConfig = {
   authDomain: "bingo-d4a00.firebaseapp.com",
   // Firebase 콘솔 > Realtime Database에서 정확한 URL을 복사해 넣으세요.
   // 예: "https://bingo-d4a00-default-rtdb.asia-southeast1.firebasedatabase.app"
-  databaseURL: "",
+  databaseURL: "https://bingo-d4a00-default-rtdb.firebaseio.com/",
   projectId: "bingo-d4a00",
   storageBucket: "bingo-d4a00.firebasestorage.app",
   messagingSenderId: "166246860692",
