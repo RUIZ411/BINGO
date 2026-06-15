@@ -33,6 +33,7 @@ const firebaseConfig = {
 const ROOM_PATH = "bingoRooms/main";
 const LOCAL_STORAGE_KEY = "bkg-bingo-v1-state";
 const LOCAL_ADMIN_PIN = "1234";
+const ADMIN_EMAIL_DOMAIN = "@suweet.com";
 
 const stateDefaults = {
   title: "오늘의 빙고",
@@ -174,7 +175,14 @@ async function loadInitialState() {
 function bindEvents() {
   els.loginBtn?.addEventListener("click", async () => {
     try {
-      await signInWithEmailAndPassword(auth, els.adminEmail.value.trim(), els.adminPassword.value);
+      const email = makeLoginEmail(els.adminEmail.value);
+
+if (!email) {
+  alert("아이디를 입력해 주세요.");
+  return;
+}
+
+await signInWithEmailAndPassword(auth, email, els.adminPassword.value);
     } catch (error) {
       alert(`로그인 실패: ${error.message}`);
     }
@@ -595,4 +603,10 @@ function setLoginStatus(text, mode) {
   els.loginStatus.textContent = text;
   els.loginStatus.classList.remove("ok", "warn");
   if (mode) els.loginStatus.classList.add(mode);
+}
+
+function makeLoginEmail(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.includes("@") ? raw : `${raw}${ADMIN_EMAIL_DOMAIN}`;
 }
