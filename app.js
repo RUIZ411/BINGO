@@ -108,7 +108,7 @@ let lastRenderedEffectNonce = 0;
 let titleSaveTimer = null;
 let cellSaveTimers = new Map();
 
-if (!["public", "obs", "admin"].includes(activeView)) activeView = "public";
+if (!["public", "obs"].includes(activeView)) activeView = "public";
 
 init();
 
@@ -126,7 +126,7 @@ function setupView() {
     link.classList.toggle("active", link.dataset.viewLink === activeView);
   });
 
-  if (activeView === "admin") {
+  if (activeView !== "obs") {
     els.adminPanel.hidden = false;
     els.adminToggleRow.hidden = false;
     els.cellEditorHelp.hidden = false;
@@ -345,9 +345,8 @@ function render() {
 }
 
 function getViewTitle() {
-  if (activeView === "admin") return "관리자 화면";
   if (activeView === "obs") return "OBS 화면";
-  return "빙고 화면";
+  return "빙고 관리";
 }
 
 function getTextLengthClass(value) {
@@ -359,13 +358,13 @@ function getTextLengthClass(value) {
 }
 
 function renderAdminLock() {
-  const locked = activeView === "admin" && !isAdmin;
+  const locked = activeView !== "obs" && !isAdmin;
   $$('[data-admin-only]').forEach((item) => {
     item.style.opacity = locked ? ".45" : "1";
     item.style.pointerEvents = locked ? "none" : "auto";
   });
 
-  const shouldDisable = activeView === "admin" && !isAdmin;
+  const shouldDisable = activeView !== "obs" && !isAdmin;
   [
     els.titleInput,
     els.sizeSelect,
@@ -398,28 +397,15 @@ function renderBoard() {
     cellEl.classList.toggle("cleared", Boolean(cell.cleared));
     cellEl.classList.toggle("line-completed", completedCellIndexes.has(index));
 
-    if (activeView === "admin" && isAdmin) {
-      const textarea = document.createElement("textarea");
-      textarea.className = `admin-cell-editor ${getTextLengthClass(cell.text)}`;
-      textarea.value = cell.text;
-      textarea.maxLength = 80;
-      textarea.addEventListener("input", () => scheduleCellTextSave(index, textarea.value));
+    const text = document.createElement("div");
+    text.className = "cell-text";
+    text.textContent = cell.text;
+    cellEl.append(text);
 
-      const actions = document.createElement("div");
-      actions.className = "cell-actions";
-
-      const toggleBtn = document.createElement("button");
-      toggleBtn.className = `cell-mini-btn${cell.cleared ? " active" : ""}`;
-      toggleBtn.textContent = cell.cleared ? "복구" : "지움";
-      toggleBtn.addEventListener("click", () => toggleCell(index));
-
-      actions.append(toggleBtn);
-      cellEl.append(textarea, actions);
-    } else {
-      const text = document.createElement("div");
-      text.className = "cell-text";
-      text.textContent = cell.text;
-      cellEl.append(text);
+    if (activeView !== "obs" && isAdmin) {
+      cellEl.classList.add("admin-clickable");
+      cellEl.title = cell.cleared ? "클릭하면 복구됩니다." : "클릭하면 지워집니다.";
+      cellEl.addEventListener("click", () => toggleCell(index));
     }
 
     els.bingoBoard.append(cellEl);
@@ -478,7 +464,7 @@ function toggleCell(index) {
 }
 
 async function commitState(mutator) {
-  if (activeView === "admin" && !isAdmin) {
+  if (!isAdmin) {
     alert("관리자 로그인 후 수정할 수 있습니다.");
     return;
   }

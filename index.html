@@ -13,14 +13,13 @@
         <span class="brand-mark">B</span>
         <div>
           <p class="eyebrow">BKG BINGO</p>
-          <h1 id="pageTitle">빙고 화면</h1>
+          <h1 id="pageTitle">오늘의 빙고</h1>
         </div>
       </div>
 
       <nav class="view-tabs" aria-label="화면 전환">
-        <a href="?view=public" data-view-link="public">공개 화면</a>
+        <a href="?view=public" data-view-link="public">메인 화면</a>
         <a href="?view=obs" data-view-link="obs">OBS 화면</a>
-        <a href="?view=admin" data-view-link="admin">관리자</a>
       </nav>
     </header>
 
@@ -136,9 +135,19 @@
       </aside>
 
       <section class="stage" id="stage">
-        <div class="board-title-card">
-          <p class="board-title-eyebrow">TODAY BINGO</p>
-          <h2 id="boardTitle">오늘의 빙고</h2>
+        <div class="score-strip">
+          <div class="score-box">
+            <span class="score-label">BINGO</span>
+            <strong id="bingoCount">0</strong>
+          </div>
+          <div class="score-box chicken-box">
+            <span class="score-label">🍗</span>
+            <strong id="chickenCount">0</strong>
+          </div>
+          <div class="score-box small-score" id="maxBingoBox">
+            <span class="score-label">MAX</span>
+            <strong id="maxBingoCount">12</strong>
+          </div>
         </div>
 
         <div class="board-wrap" id="boardWrap">
@@ -151,23 +160,8 @@
           </div>
         </div>
 
-        <div class="score-strip">
-          <div class="score-box">
-            <span class="score-label">BINGO</span>
-            <strong id="bingoCount">0</strong>
-          </div>
-          <div class="score-box chicken-box">
-            <span class="score-label">🍗</span>
-            <strong id="chickenCount">0</strong>
-          </div>
-          <div class="score-box small-score" id="maxBingoBox" hidden>
-            <span class="score-label">MAX</span>
-            <strong id="maxBingoCount">12</strong>
-          </div>
-        </div>
-
         <div id="cellEditorHelp" class="editor-help" hidden>
-          칸 안의 내용을 수정하거나, 아래 버튼으로 지움/복구를 전환할 수 있어요.
+          관리자로 로그인하면 왼쪽 빙고칸을 클릭해서 바로 지움/복구할 수 있어요.
         </div>
       </section>
     </main>

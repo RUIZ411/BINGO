@@ -597,7 +597,6 @@ body.view-obs .board-canvas {
 
 body.view-public .layout { grid-template-columns: 1fr; }
 body.view-public .admin-panel { display: none !important; }
-body.view-admin .stage { position: sticky; top: 16px; }
 
 @keyframes drawLine { to { stroke-dashoffset: 0; } }
 
@@ -622,7 +621,6 @@ body.view-admin .stage { position: sticky; top: 16px; }
 
 @media (max-width: 1080px) {
   .layout { grid-template-columns: 1fr; }
-  body.view-admin .stage { position: static; }
   .admin-panel { order: 2; }
 }
 
@@ -821,5 +819,82 @@ body.view-obs .score-strip {
   .score-box {
     min-width: 118px;
     min-height: 56px;
+  }
+}
+
+
+/* Main split layout: left bingo board + right admin panel */
+body.view-public .layout {
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 20px;
+  align-items: start;
+}
+
+body.view-public .stage {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: calc(100vh - 160px);
+}
+
+body.view-public .admin-panel {
+  display: flex !important;
+  grid-column: 2;
+  grid-row: 1;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 159, 199, .55) rgba(255,255,255,.35);
+}
+
+body.view-public .admin-panel::-webkit-scrollbar { width: 8px; }
+body.view-public .admin-panel::-webkit-scrollbar-track { background: rgba(255,255,255,.35); border-radius: 999px; }
+body.view-public .admin-panel::-webkit-scrollbar-thumb { background: rgba(255, 159, 199, .55); border-radius: 999px; }
+
+body.view-public.admin-collapsed .layout { grid-template-columns: 1fr; }
+body.view-public.admin-collapsed .admin-panel { display: none !important; }
+
+body.view-public .admin-toggle-row {
+  justify-content: flex-end;
+}
+
+body.view-public .admin-toggle::before {
+  content: "⚙️ ";
+}
+
+.cell.admin-clickable {
+  cursor: pointer;
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+}
+
+.cell.admin-clickable:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 127, 172, .95);
+  box-shadow: 0 14px 26px rgba(178,116,158,.16), 0 0 0 4px rgba(255,159,199,.14), inset 0 -4px 0 rgba(255,159,199,.08);
+}
+
+body.view-public .editor-help {
+  margin-top: 10px;
+}
+
+@media (max-width: 1180px) {
+  body.view-public .layout {
+    grid-template-columns: 1fr;
+  }
+
+  body.view-public .stage {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  body.view-public .admin-panel {
+    grid-column: 1;
+    grid-row: 2;
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
 }
