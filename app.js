@@ -34,6 +34,7 @@ const firebaseConfig = {
 
 const ROOM_PATH = "bingoRooms/main";
 const LOCAL_STORAGE_KEY = "bkg-bingo-v1-state";
+const OBS_SCALE_STORAGE_KEY = "bkg-bingo-obs-scale";
 const LOCAL_ADMIN_PIN = "1234";
 const ADMIN_EMAIL_DOMAIN = "@suweet.com";
 
@@ -102,7 +103,9 @@ const els = {
   chickenCount: $("#chickenCount"),
   maxBingoCount: $("#maxBingoCount"),
   maxBingoBox: $("#maxBingoBox"),
-  cellEditorHelp: $("#cellEditorHelp")
+  cellEditorHelp: $("#cellEditorHelp"),
+  obsScalePanel: $("#obsScalePanel"),
+  obsScaleButtons: $$(`[data-obs-scale]`)
 };
 
 let currentState = makeInitialState();
@@ -116,6 +119,7 @@ let activeView = new URLSearchParams(location.search).get("view") || "public";
 let lastRenderedEffectNonce = 0;
 let titleSaveTimer = null;
 let cellSaveTimers = new Map();
+let obsScale = getInitialObsScale();
 
 if (!["public", "obs"].includes(activeView)) activeView = "public";
 
@@ -139,7 +143,11 @@ function setupView() {
     els.adminPanel.hidden = false;
     els.adminToggleRow.hidden = false;
     els.cellEditorHelp.hidden = false;
+  } else if (els.obsScalePanel) {
+    els.obsScalePanel.hidden = false;
   }
+
+  applyObsScale(obsScale);
 }
 
 function setupFirebaseIfAvailable() {
@@ -201,6 +209,14 @@ function bindEvents() {
   els.adminToggle?.addEventListener("click", () => {
     const collapsed = document.body.classList.toggle("admin-collapsed");
     els.adminToggle.textContent = collapsed ? "관리자 패널 열기" : "관리자 패널 접기";
+  });
+
+  els.obsScaleButtons?.forEach((button) => {
+    button.addEventListener("click", () => {
+      const scale = Number(button.dataset.obsScale || 1);
+      applyObsScale(scale);
+      localStorage.setItem(OBS_SCALE_STORAGE_KEY, String(scale));
+    });
   });
 
   els.loginBtn?.addEventListener("click", async () => {
@@ -754,6 +770,29 @@ function shuffleArray(array) {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
+}
+
+function getInitialObsScale() {
+  const params = new URLSearchParams(location.search);
+  const fromQuery = Number(params.get("scale"));
+  const fromStorage = Number(localStorage.getItem(OBS_SCALE_STORAGE_KEY));
+  const value = Number.isFinite(fromQuery) && fromQuery > 0 ? fromQuery : fromStorage;
+  return normalizeObsScale(value || 1);
+}
+
+function normalizeObsScale(value) {
+  const allowed = [1, 0.8, 0.67, 0.5];
+  const number = Number(value);
+  return allowed.find((scale) => Math.abs(scale - number) < 0.01) || 1;
+}
+
+function applyObsScale(value) {
+  obsScale = normalizeObsScale(value);
+  document.documentElement.style.setProperty("--obs-scale", String(obsScale));
+  els.obsScaleButtons?.forEach((button) => {
+    const scale = Number(button.dataset.obsScale || 1);
+    button.classList.toggle("active", Math.abs(scale - obsScale) < 0.01);
+  });
 }
 
 function setLoginStatus(text, mode) {
