@@ -20,6 +20,7 @@
       <nav class="view-tabs" aria-label="화면 전환">
         <a href="?view=public" data-view-link="public">메인 화면</a>
         <a href="?view=obs" data-view-link="obs">송출용</a>
+        <button id="memoOpenBtn" class="memo-open-btn" type="button">📝 메모장</button>
       </nav>
     </header>
 
@@ -268,6 +269,28 @@
         <button type="button" data-obs-scale="0.5">50%</button>
       </aside>
     </main>
+  </div>
+
+  <div id="memoModal" class="memo-modal" hidden>
+    <div class="memo-backdrop" data-memo-close></div>
+    <section class="memo-dialog" role="dialog" aria-modal="true" aria-labelledby="memoTitle">
+      <div class="memo-head">
+        <div>
+          <p class="eyebrow">QUICK NOTE</p>
+          <h2 id="memoTitle">메모장</h2>
+        </div>
+        <button id="memoCloseBtn" class="memo-icon-btn" type="button" aria-label="메모장 닫기">×</button>
+      </div>
+      <textarea id="memoText" class="memo-textarea" placeholder="방송 중 기억할 내용이나 숫자, 미션 메모를 적어두세요."></textarea>
+      <div class="memo-footer">
+        <span id="memoSaveStatus" class="memo-status">저장된 메모가 표시됩니다.</span>
+        <div class="row-buttons wrap memo-actions">
+          <button id="memoSaveBtn" class="primary-btn" type="button">저장</button>
+          <button id="memoClearBtn" class="ghost-btn danger-soft" type="button">비우기</button>
+          <button id="memoCancelBtn" class="ghost-btn" type="button">닫기</button>
+        </div>
+      </div>
+    </section>
   </div>
 
   <script type="module" src="./app.js"></script>

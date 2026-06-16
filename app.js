@@ -52,6 +52,7 @@ const stateDefaults = {
     all: 0
   },
   bountyNumbers: [],
+  memoText: "",
   bingoCount: 0,
   completedLines: {},
   effectNonce: 0,
@@ -129,7 +130,15 @@ const els = {
   maxBingoBox: $("#maxBingoBox"),
   cellEditorHelp: $("#cellEditorHelp"),
   obsScalePanel: $("#obsScalePanel"),
-  obsScaleButtons: $$(`[data-obs-scale]`)
+  obsScaleButtons: $$(`[data-obs-scale]`),
+  memoOpenBtn: $("#memoOpenBtn"),
+  memoModal: $("#memoModal"),
+  memoCloseBtn: $("#memoCloseBtn"),
+  memoCancelBtn: $("#memoCancelBtn"),
+  memoText: $("#memoText"),
+  memoSaveBtn: $("#memoSaveBtn"),
+  memoClearBtn: $("#memoClearBtn"),
+  memoSaveStatus: $("#memoSaveStatus")
 };
 
 let currentState = makeInitialState();
@@ -162,6 +171,8 @@ function setupView() {
   $$('[data-view-link]').forEach((link) => {
     link.classList.toggle("active", link.dataset.viewLink === activeView);
   });
+
+  if (els.memoOpenBtn) els.memoOpenBtn.hidden = activeView === "obs";
 
   if (activeView !== "obs") {
     els.adminPanel.hidden = false;
@@ -233,6 +244,48 @@ function bindEvents() {
   els.adminToggle?.addEventListener("click", () => {
     const collapsed = document.body.classList.toggle("admin-collapsed");
     els.adminToggle.textContent = collapsed ? "관리자 패널 열기" : "관리자 패널 접기";
+  });
+
+  els.memoOpenBtn?.addEventListener("click", openMemoModal);
+  els.memoCloseBtn?.addEventListener("click", closeMemoModal);
+  els.memoCancelBtn?.addEventListener("click", closeMemoModal);
+  els.memoModal?.addEventListener("click", (event) => {
+    if (event.target?.hasAttribute?.("data-memo-close")) closeMemoModal();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && els.memoModal && !els.memoModal.hidden) {
+      closeMemoModal();
+    }
+  });
+
+  els.memoText?.addEventListener("input", () => {
+    if (!isAdmin) return;
+    if (els.memoSaveStatus) els.memoSaveStatus.textContent = "저장하지 않은 변경사항이 있어요.";
+  });
+
+  els.memoSaveBtn?.addEventListener("click", () => {
+    if (!isAdmin) {
+      alert("관리자로 로그인해야 메모를 저장할 수 있어요.");
+      return;
+    }
+    commitState((draft) => {
+      draft.memoText = els.memoText?.value || "";
+    });
+    if (els.memoSaveStatus) els.memoSaveStatus.textContent = "메모가 저장됐어요.";
+  });
+
+  els.memoClearBtn?.addEventListener("click", () => {
+    if (!isAdmin) {
+      alert("관리자로 로그인해야 메모를 비울 수 있어요.");
+      return;
+    }
+    if (!confirm("메모 내용을 비울까요?")) return;
+    commitState((draft) => {
+      draft.memoText = "";
+    });
+    if (els.memoText) els.memoText.value = "";
+    if (els.memoSaveStatus) els.memoSaveStatus.textContent = "메모가 비워졌어요.";
   });
 
   els.obsScaleButtons?.forEach((button) => {
@@ -447,6 +500,36 @@ function makeLoginEmail(value) {
   return raw.includes("@") ? raw : `${raw}${ADMIN_EMAIL_DOMAIN}`;
 }
 
+
+function openMemoModal() {
+  if (!els.memoModal) return;
+  els.memoModal.hidden = false;
+  document.body.classList.add("memo-open");
+  renderMemoState(true);
+  setTimeout(() => els.memoText?.focus(), 0);
+}
+
+function closeMemoModal() {
+  if (!els.memoModal) return;
+  els.memoModal.hidden = true;
+  document.body.classList.remove("memo-open");
+}
+
+function renderMemoState(forceSync = false) {
+  if (!els.memoText) return;
+  const memo = String(currentState.memoText || "");
+  const isEditingMemo = document.activeElement === els.memoText && !forceSync;
+  if (!isEditingMemo) els.memoText.value = memo;
+  els.memoText.readOnly = !isAdmin;
+  if (els.memoSaveBtn) els.memoSaveBtn.disabled = !isAdmin;
+  if (els.memoClearBtn) els.memoClearBtn.disabled = !isAdmin || !memo.trim();
+  if (els.memoSaveStatus) {
+    els.memoSaveStatus.textContent = isAdmin
+      ? (memo.trim() ? "메모가 Firebase에 저장되어 있어요." : "저장된 메모가 없습니다.")
+      : "보기 전용입니다. 저장하려면 관리자 로그인이 필요해요.";
+  }
+}
+
 function updateChicken(delta) {
   commitState((draft) => {
     draft.chickenCount = Math.max(0, Number(draft.chickenCount || 0) + delta);
@@ -615,6 +698,7 @@ function render() {
   if (els.standardScoreStrip) els.standardScoreStrip.hidden = isResetBingo;
   if (els.resetScoreMenu) els.resetScoreMenu.hidden = !isResetBingo;
   if (els.maxBingoCount) els.maxBingoCount.textContent = currentState.size * 2 + 2;
+  renderMemoState();
   if (els.bingoBoard) els.bingoBoard.style.setProperty("--cell-size", currentState.size);
 
   renderAdminLock();
@@ -837,6 +921,7 @@ function normalizeState(raw) {
     lastNewLines: Array.isArray(raw?.lastNewLines) ? raw.lastNewLines : [],
     drawnNumbers: normalizeDrawnNumbers(raw?.drawnNumbers),
     bountyNumbers: normalizeBountyNumbers(raw?.bountyNumbers),
+    memoText: String(raw?.memoText || ""),
     lastDrawnNumber: normalizeLastDrawnNumber(raw?.lastDrawnNumber),
     lastDrawMatched: Boolean(raw?.lastDrawMatched),
     cells
