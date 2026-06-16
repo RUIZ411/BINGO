@@ -19,7 +19,7 @@
 
       <nav class="view-tabs" aria-label="화면 전환">
         <a href="?view=public" data-view-link="public">메인 화면</a>
-        <a href="?view=obs" data-view-link="obs">송출용 화면</a>
+        <a href="?view=obs" data-view-link="obs">송출용</a>
       </nav>
     </header>
 
@@ -88,6 +88,7 @@
                 <option value="mission">미션</option>
                 <option value="number">숫자</option>
                 <option value="alphabet">알파벳</option>
+                <option value="reset">리셋</option>
               </select>
             </label>
           </div>
@@ -135,6 +136,28 @@
           </div>
         </section>
 
+        <section class="panel-card admin-only reset-menu-admin" id="resetMenuAdmin" data-admin-only>
+          <div class="panel-head">
+            <h2>리셋 빙고 메뉴판</h2>
+            <span class="status-pill">리셋 전용</span>
+          </div>
+          <div class="reset-reward-grid">
+            <label>
+              한개
+              <input id="resetRewardOne" type="number" min="0" step="1" value="0" />
+            </label>
+            <label>
+              한줄
+              <input id="resetRewardLine" type="number" min="0" step="1" value="0" />
+            </label>
+            <label>
+              전체
+              <input id="resetRewardAll" type="number" min="0" step="1" value="0" />
+            </label>
+          </div>
+          <p class="help-text">리셋 빙고일 때 송출 화면 아래 메뉴판에 표시되는 개수를 설정합니다.</p>
+        </section>
+
         <section class="panel-card admin-only" data-admin-only>
           <div class="panel-head">
             <h2>미션 일괄 입력</h2>
@@ -174,7 +197,7 @@
           </div>
         </div>
 
-        <div class="score-strip score-strip-bottom">
+        <div class="score-strip score-strip-bottom" id="standardScoreStrip">
           <div class="score-box">
             <span class="score-label">BINGO</span>
             <strong id="bingoCount">0</strong>
@@ -186,6 +209,33 @@
           <div class="score-box small-score" id="maxBingoBox" hidden>
             <span class="score-label">MAX</span>
             <strong id="maxBingoCount">12</strong>
+          </div>
+        </div>
+
+        <div class="reset-score-menu" id="resetScoreMenu" hidden>
+          <div class="reset-score-stack">
+            <div class="score-box reset-score-box">
+              <span class="score-label">BINGO</span>
+              <strong id="resetBingoCount">0</strong>
+            </div>
+            <div class="score-box chicken-box reset-score-box">
+              <span class="score-label">🍗</span>
+              <strong id="resetChickenCount">0</strong>
+            </div>
+          </div>
+          <div class="reset-menu-board">
+            <div class="reset-menu-row">
+              <span>한개</span>
+              <strong><b id="resetMenuOne">0</b>개</strong>
+            </div>
+            <div class="reset-menu-row">
+              <span>한줄</span>
+              <strong><b id="resetMenuLine">0</b>개</strong>
+            </div>
+            <div class="reset-menu-row">
+              <span>전체</span>
+              <strong><b id="resetMenuAll">0</b>개</strong>
+            </div>
           </div>
         </div>
 

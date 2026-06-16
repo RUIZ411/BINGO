@@ -46,6 +46,11 @@ const stateDefaults = {
   size: 5,
   contentType: "mission",
   chickenCount: 0,
+  resetRewards: {
+    one: 0,
+    line: 0,
+    all: 0
+  },
   bingoCount: 0,
   completedLines: {},
   effectNonce: 0,
@@ -92,6 +97,17 @@ const els = {
   chickenInput: $("#chickenInput"),
   chickenMinusBtn: $("#chickenMinusBtn"),
   chickenPlusBtn: $("#chickenPlusBtn"),
+  resetMenuAdmin: $("#resetMenuAdmin"),
+  resetRewardOne: $("#resetRewardOne"),
+  resetRewardLine: $("#resetRewardLine"),
+  resetRewardAll: $("#resetRewardAll"),
+  standardScoreStrip: $("#standardScoreStrip"),
+  resetScoreMenu: $("#resetScoreMenu"),
+  resetBingoCount: $("#resetBingoCount"),
+  resetChickenCount: $("#resetChickenCount"),
+  resetMenuOne: $("#resetMenuOne"),
+  resetMenuLine: $("#resetMenuLine"),
+  resetMenuAll: $("#resetMenuAll"),
   bulkText: $("#bulkText"),
   applyBulkBtn: $("#applyBulkBtn"),
   clearBulkBtn: $("#clearBulkBtn"),
@@ -269,6 +285,7 @@ function bindEvents() {
   els.typeSelect.addEventListener("change", () => {
     syncSizeSelectForType(els.typeSelect.value);
     updateNumberDrawControls();
+    updateResetMenuAdminState();
   });
 
   els.sizeSelect.addEventListener("change", () => {
@@ -327,6 +344,20 @@ function bindEvents() {
     const value = Math.max(0, Number(els.chickenInput.value || 0));
     commitState((draft) => {
       draft.chickenCount = value;
+    });
+  });
+
+  [
+    [els.resetRewardOne, "one"],
+    [els.resetRewardLine, "line"],
+    [els.resetRewardAll, "all"]
+  ].forEach(([input, key]) => {
+    input?.addEventListener("change", () => {
+      const value = Math.max(0, Number(input.value || 0));
+      commitState((draft) => {
+        draft.resetRewards = normalizeResetRewards(draft.resetRewards);
+        draft.resetRewards[key] = value;
+      });
     });
   });
 
@@ -392,6 +423,28 @@ function makeLoginEmail(value) {
 function updateChicken(delta) {
   commitState((draft) => {
     draft.chickenCount = Math.max(0, Number(draft.chickenCount || 0) + delta);
+  });
+}
+
+function normalizeResetRewards(value) {
+  return {
+    one: Math.max(0, Number(value?.one || 0)),
+    line: Math.max(0, Number(value?.line || 0)),
+    all: Math.max(0, Number(value?.all || 0))
+  };
+}
+
+function updateResetMenuAdminState() {
+  const selectedType = els.typeSelect?.value || currentState.contentType;
+  const isReset = selectedType === "reset" || currentState.contentType === "reset";
+
+  if (els.resetMenuAdmin) {
+    els.resetMenuAdmin.classList.toggle("is-muted", !isReset);
+  }
+
+  [els.resetRewardOne, els.resetRewardLine, els.resetRewardAll].forEach((input) => {
+    if (!input) return;
+    input.disabled = !isAdmin || activeView === "obs";
   });
 }
 
@@ -484,22 +537,37 @@ function render() {
   if (els.titleInput) els.titleInput.value = currentState.title;
   if (els.typeSelect) els.typeSelect.value = currentState.contentType;
   syncSizeSelectForType(currentState.contentType, currentState.size);
+  const isResetBingo = currentState.contentType === "reset";
+  const resetRewards = normalizeResetRewards(currentState.resetRewards);
+  document.body.classList.toggle("is-reset-bingo", isResetBingo);
+
   if (els.chickenInput) els.chickenInput.value = String(currentState.chickenCount);
   if (els.chickenPreview) els.chickenPreview.textContent = currentState.chickenCount;
   if (els.bingoCount) els.bingoCount.textContent = currentState.bingoCount;
   if (els.chickenCount) els.chickenCount.textContent = currentState.chickenCount;
+  if (els.resetBingoCount) els.resetBingoCount.textContent = currentState.bingoCount;
+  if (els.resetChickenCount) els.resetChickenCount.textContent = currentState.chickenCount;
+  if (els.resetRewardOne) els.resetRewardOne.value = String(resetRewards.one);
+  if (els.resetRewardLine) els.resetRewardLine.value = String(resetRewards.line);
+  if (els.resetRewardAll) els.resetRewardAll.value = String(resetRewards.all);
+  if (els.resetMenuOne) els.resetMenuOne.textContent = String(resetRewards.one);
+  if (els.resetMenuLine) els.resetMenuLine.textContent = String(resetRewards.line);
+  if (els.resetMenuAll) els.resetMenuAll.textContent = String(resetRewards.all);
+  if (els.standardScoreStrip) els.standardScoreStrip.hidden = isResetBingo;
+  if (els.resetScoreMenu) els.resetScoreMenu.hidden = !isResetBingo;
   if (els.maxBingoCount) els.maxBingoCount.textContent = currentState.size * 2 + 2;
   if (els.bingoBoard) els.bingoBoard.style.setProperty("--cell-size", currentState.size);
 
   renderAdminLock();
   updateNumberDrawControls();
+  updateResetMenuAdminState();
   renderBoard();
   renderLines();
   maybePlayBingoEffect();
 }
 
 function getViewTitle() {
-  if (activeView === "obs") return "OBS 화면";
+  if (activeView === "obs") return "송출용";
   return "빙고 관리";
 }
 
@@ -530,6 +598,9 @@ function renderAdminLock() {
     els.chickenInput,
     els.chickenMinusBtn,
     els.chickenPlusBtn,
+    els.resetRewardOne,
+    els.resetRewardLine,
+    els.resetRewardAll,
     els.bulkText,
     els.applyBulkBtn,
     els.clearBulkBtn,
@@ -688,6 +759,7 @@ function normalizeState(raw) {
     size,
     contentType,
     chickenCount: Math.max(0, Number(raw?.chickenCount || 0)),
+    resetRewards: normalizeResetRewards(raw?.resetRewards),
     effectNonce: Number(raw?.effectNonce || 0),
     lastNewLines: Array.isArray(raw?.lastNewLines) ? raw.lastNewLines : [],
     drawnNumbers: normalizeDrawnNumbers(raw?.drawnNumbers),
