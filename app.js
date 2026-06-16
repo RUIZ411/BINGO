@@ -538,8 +538,10 @@ function render() {
   if (els.typeSelect) els.typeSelect.value = currentState.contentType;
   syncSizeSelectForType(currentState.contentType, currentState.size);
   const isResetBingo = currentState.contentType === "reset";
+  const isNumberBingo = currentState.contentType === "number";
   const resetRewards = normalizeResetRewards(currentState.resetRewards);
   document.body.classList.toggle("is-reset-bingo", isResetBingo);
+  document.body.classList.toggle("is-number-bingo", isNumberBingo);
 
   if (els.chickenInput) els.chickenInput.value = String(currentState.chickenCount);
   if (els.chickenPreview) els.chickenPreview.textContent = currentState.chickenCount;
@@ -577,6 +579,13 @@ function getTextLengthClass(value) {
   if (length <= 8) return "text-medium";
   if (length <= 13) return "text-long";
   return "text-xlong";
+}
+
+function getNumberDigitClass(value) {
+  const digits = String(value || "").replace(/\D/g, "").length;
+  if (digits <= 1) return "number-digit-1";
+  if (digits === 2) return "number-digit-2";
+  return "number-digit-3";
 }
 
 function renderAdminLock() {
@@ -623,7 +632,8 @@ function renderBoard() {
 
   currentState.cells.forEach((cell, index) => {
     const cellEl = document.createElement("div");
-    cellEl.className = `cell ${getTextLengthClass(cell.text)}`;
+    const numberDigitClass = currentState.contentType === "number" ? getNumberDigitClass(cell.text) : "";
+    cellEl.className = `cell ${getTextLengthClass(cell.text)} ${numberDigitClass}`.trim();
     cellEl.dataset.index = String(index);
     cellEl.classList.toggle("cleared", Boolean(cell.cleared));
     cellEl.classList.toggle("line-completed", completedCellIndexes.has(index));
