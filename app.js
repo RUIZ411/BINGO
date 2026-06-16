@@ -119,6 +119,10 @@ const els = {
   applyBulkBtn: $("#applyBulkBtn"),
   clearBulkBtn: $("#clearBulkBtn"),
   hardResetBtn: $("#hardResetBtn"),
+  editModePanel: $("#editModePanel"),
+  editModeToggleBtn: $("#editModeToggleBtn"),
+  editModeStatus: $("#editModeStatus"),
+  editModeHelp: $("#editModeHelp"),
   stage: $("#stage"),
   boardWrap: $("#boardWrap"),
   bingoBoard: $("#bingoBoard"),
@@ -138,7 +142,14 @@ const els = {
   memoText: $("#memoText"),
   memoSaveBtn: $("#memoSaveBtn"),
   memoClearBtn: $("#memoClearBtn"),
-  memoSaveStatus: $("#memoSaveStatus")
+  memoSaveStatus: $("#memoSaveStatus"),
+  cellEditModal: $("#cellEditModal"),
+  cellEditCloseBtn: $("#cellEditCloseBtn"),
+  cellEditCancelBtn: $("#cellEditCancelBtn"),
+  cellEditSaveBtn: $("#cellEditSaveBtn"),
+  cellEditInput: $("#cellEditInput"),
+  cellEditCurrent: $("#cellEditCurrent"),
+  cellEditHelpText: $("#cellEditHelpText")
 };
 
 let currentState = makeInitialState();
@@ -153,6 +164,8 @@ let lastRenderedEffectNonce = 0;
 let titleSaveTimer = null;
 let cellSaveTimers = new Map();
 let obsScale = getInitialObsScale();
+let isEditMode = false;
+let editingCellIndex = null;
 
 if (!["public", "obs"].includes(activeView)) activeView = "public";
 
@@ -203,8 +216,14 @@ function setupFirebaseIfAvailable() {
 
   onAuthStateChanged(auth, (user) => {
     isAdmin = Boolean(user);
+    if (!isAdmin) {
+      isEditMode = false;
+      closeCellEditModal();
+    }
     setLoginStatus(isAdmin ? "관리자 로그인됨" : "보기 전용", isAdmin ? "ok" : "warn");
     renderAdminLock();
+    renderEditModeState();
+    renderBoard();
   });
 
   onValue(roomRef, (snapshot) => {
@@ -254,10 +273,34 @@ function bindEvents() {
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && els.memoModal && !els.memoModal.hidden) {
-      closeMemoModal();
+    if (event.key === "Escape") {
+      if (els.cellEditModal && !els.cellEditModal.hidden) closeCellEditModal();
+      if (els.memoModal && !els.memoModal.hidden) closeMemoModal();
+    }
+
+    if (event.key === "Enter" && els.cellEditModal && !els.cellEditModal.hidden && document.activeElement === els.cellEditInput) {
+      event.preventDefault();
+      saveCellEdit();
     }
   });
+
+  els.editModeToggleBtn?.addEventListener("click", () => {
+    if (!isAdmin) {
+      alert("관리자 로그인 후 수정 모드를 사용할 수 있어요.");
+      return;
+    }
+    isEditMode = !isEditMode;
+    if (!isEditMode) closeCellEditModal();
+    renderEditModeState();
+    renderBoard();
+  });
+
+  els.cellEditCloseBtn?.addEventListener("click", closeCellEditModal);
+  els.cellEditCancelBtn?.addEventListener("click", closeCellEditModal);
+  els.cellEditModal?.addEventListener("click", (event) => {
+    if (event.target?.hasAttribute?.("data-cell-edit-close")) closeCellEditModal();
+  });
+  els.cellEditSaveBtn?.addEventListener("click", saveCellEdit);
 
   els.memoText?.addEventListener("input", () => {
     if (!isAdmin) return;
@@ -327,6 +370,8 @@ function bindEvents() {
 
   els.localLogoutBtn?.addEventListener("click", () => {
     isAdmin = false;
+    isEditMode = false;
+    closeCellEditModal();
     setLoginStatus("로컬 모드", "warn");
     renderAdminLock();
     render();
@@ -530,6 +575,132 @@ function renderMemoState(forceSync = false) {
   }
 }
 
+function renderEditModeState() {
+  if (!isAdmin || activeView === "obs") {
+    isEditMode = false;
+    closeCellEditModal();
+  }
+
+  document.body.classList.toggle("cell-edit-mode", isEditMode);
+
+  if (els.editModeStatus) {
+    els.editModeStatus.textContent = isEditMode ? "ON" : "OFF";
+    els.editModeStatus.classList.toggle("ok", isEditMode);
+    els.editModeStatus.classList.toggle("warn", !isEditMode);
+  }
+
+  if (els.editModeToggleBtn) {
+    els.editModeToggleBtn.textContent = isEditMode ? "수정 모드 끄기" : "수정 모드 켜기";
+    els.editModeToggleBtn.classList.toggle("is-on", isEditMode);
+    els.editModeToggleBtn.disabled = !isAdmin || activeView === "obs";
+  }
+
+  if (els.editModeHelp) {
+    els.editModeHelp.textContent = isEditMode
+      ? "수정 모드 ON: 왼쪽 빙고칸을 클릭하면 내용 수정창이 열립니다."
+      : "수정 모드를 켜면 왼쪽 빙고칸을 클릭해서 내용을 직접 바꿀 수 있어요.";
+  }
+
+  if (els.cellEditorHelp) {
+    els.cellEditorHelp.textContent = isEditMode
+      ? "현재 칸 수정 모드입니다. 칸을 클릭하면 내용을 바꿀 수 있어요."
+      : "관리자로 로그인하면 왼쪽 빙고칸을 클릭해서 바로 지움/복구할 수 있어요.";
+  }
+}
+
+function openCellEditModal(index) {
+  if (!isAdmin) {
+    alert("관리자 로그인 후 수정할 수 있습니다.");
+    return;
+  }
+
+  const cell = currentState.cells[index];
+  if (!cell || !els.cellEditModal) return;
+
+  editingCellIndex = index;
+  if (els.cellEditCurrent) els.cellEditCurrent.textContent = cell.text || "-";
+  if (els.cellEditInput) {
+    els.cellEditInput.value = cell.text || "";
+    els.cellEditInput.maxLength = currentState.contentType === "mission" ? 60 : 3;
+    els.cellEditInput.inputMode = currentState.contentType === "number" ? "numeric" : "text";
+  }
+  if (els.cellEditHelpText) els.cellEditHelpText.textContent = getCellEditHelpText();
+
+  els.cellEditModal.hidden = false;
+  document.body.classList.add("memo-open");
+  setTimeout(() => {
+    els.cellEditInput?.focus();
+    els.cellEditInput?.select();
+  }, 0);
+}
+
+function closeCellEditModal() {
+  if (!els.cellEditModal) return;
+  els.cellEditModal.hidden = true;
+  editingCellIndex = null;
+  if (!els.memoModal || els.memoModal.hidden) document.body.classList.remove("memo-open");
+}
+
+function saveCellEdit() {
+  if (editingCellIndex == null) return;
+  if (!isAdmin) {
+    alert("관리자 로그인 후 수정할 수 있습니다.");
+    return;
+  }
+
+  const result = normalizeEditedCellText(els.cellEditInput?.value || "", currentState.contentType);
+  if (!result.ok) {
+    alert(result.message);
+    return;
+  }
+
+  const duplicate = currentState.cells.some((cell, index) => {
+    if (index === editingCellIndex) return false;
+    return String(cell.text).trim().toUpperCase() === result.value.toUpperCase();
+  });
+
+  if (duplicate && ["number", "alphabet", "reset"].includes(currentState.contentType)) {
+    const proceed = confirm("이미 같은 값이 빙고판에 있습니다. 그래도 수정할까요?");
+    if (!proceed) return;
+  }
+
+  const indexToSave = editingCellIndex;
+  commitState((draft) => {
+    if (!draft.cells[indexToSave]) return;
+    draft.cells[indexToSave].text = result.value;
+  });
+  closeCellEditModal();
+}
+
+function getCellEditHelpText() {
+  if (currentState.contentType === "number") return "숫자 빙고는 1~100 숫자만 입력할 수 있어요.";
+  if (currentState.contentType === "alphabet" || currentState.contentType === "reset") return "알파벳/리셋 빙고는 A~Z 한 글자만 입력할 수 있어요.";
+  return "미션 빙고는 자유롭게 내용을 입력할 수 있어요. 긴 문구는 자동으로 줄바꿈됩니다.";
+}
+
+function normalizeEditedCellText(value, contentType) {
+  const raw = String(value || "").trim();
+
+  if (contentType === "number") {
+    const number = Number(raw);
+    if (!/^\d+$/.test(raw) || !Number.isInteger(number) || number < 1 || number > 100) {
+      return { ok: false, message: "숫자 빙고는 1~100 사이의 숫자만 입력할 수 있어요." };
+    }
+    return { ok: true, value: String(number) };
+  }
+
+  if (contentType === "alphabet" || contentType === "reset") {
+    const letter = raw.toUpperCase();
+    if (!/^[A-Z]$/.test(letter)) {
+      return { ok: false, message: "알파벳/리셋 빙고는 A~Z 한 글자만 입력할 수 있어요." };
+    }
+    return { ok: true, value: letter };
+  }
+
+  if (!raw) return { ok: false, message: "빈 내용으로는 수정할 수 없어요." };
+  return { ok: true, value: raw };
+}
+
 function updateChicken(delta) {
   commitState((draft) => {
     draft.chickenCount = Math.max(0, Number(draft.chickenCount || 0) + delta);
@@ -702,6 +873,7 @@ function render() {
   if (els.bingoBoard) els.bingoBoard.style.setProperty("--cell-size", currentState.size);
 
   renderAdminLock();
+  renderEditModeState();
   updateNumberDrawControls();
   updateBountyPanelState();
   updateResetMenuAdminState();
@@ -758,7 +930,8 @@ function renderAdminLock() {
     els.bulkText,
     els.applyBulkBtn,
     els.clearBulkBtn,
-    els.hardResetBtn
+    els.hardResetBtn,
+    els.editModeToggleBtn
   ].forEach((el) => {
     if (el) el.disabled = shouldDisable;
   });
@@ -792,8 +965,17 @@ function renderBoard() {
 
     if (activeView !== "obs" && isAdmin) {
       cellEl.classList.add("admin-clickable");
-      cellEl.title = cell.cleared ? "클릭하면 복구됩니다." : "클릭하면 지워집니다.";
-      cellEl.addEventListener("click", () => toggleCell(index));
+      cellEl.classList.toggle("edit-clickable", isEditMode);
+      cellEl.title = isEditMode
+        ? "수정 모드: 클릭하면 내용을 바꿉니다."
+        : (cell.cleared ? "클릭하면 복구됩니다." : "클릭하면 지워집니다.");
+      cellEl.addEventListener("click", () => {
+        if (isEditMode) {
+          openCellEditModal(index);
+          return;
+        }
+        toggleCell(index);
+      });
     }
 
     els.bingoBoard.append(cellEl);

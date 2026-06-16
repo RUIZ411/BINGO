@@ -20,7 +20,6 @@
       <nav class="view-tabs" aria-label="화면 전환">
         <a href="?view=public" data-view-link="public">메인 화면</a>
         <a href="?view=obs" data-view-link="obs">송출용</a>
-        <button id="memoOpenBtn" class="memo-open-btn" type="button">📝 메모장</button>
       </nav>
     </header>
 
@@ -140,6 +139,15 @@
           </div>
           <p class="help-text">입력한 숫자와 같은 빙고칸 숫자가 빨간색으로 표시됩니다. 1~100 숫자만 적용돼요.</p>
         </section>
+        <section class="panel-card admin-only edit-mode-panel" id="editModePanel" data-admin-only>
+          <div class="panel-head">
+            <h2>칸 수정 모드</h2>
+            <span id="editModeStatus" class="status-pill">OFF</span>
+          </div>
+          <button id="editModeToggleBtn" class="primary-btn edit-mode-toggle" type="button">수정 모드 켜기</button>
+          <p id="editModeHelp" class="help-text">수정 모드를 켜면 왼쪽 빙고칸을 클릭해서 내용을 직접 바꿀 수 있어요.</p>
+        </section>
+
 
         <section class="panel-card admin-only" data-admin-only>
           <div class="panel-head">
@@ -273,24 +281,53 @@
 
   <div id="memoModal" class="memo-modal" hidden>
     <div class="memo-backdrop" data-memo-close></div>
-    <section class="memo-dialog" role="dialog" aria-modal="true" aria-labelledby="memoTitle">
+    <div class="memo-dialog" role="dialog" aria-modal="true" aria-labelledby="memoTitle">
       <div class="memo-head">
         <div>
-          <p class="eyebrow">QUICK NOTE</p>
+          <p class="eyebrow">MEMO</p>
           <h2 id="memoTitle">메모장</h2>
         </div>
         <button id="memoCloseBtn" class="memo-icon-btn" type="button" aria-label="메모장 닫기">×</button>
       </div>
-      <textarea id="memoText" class="memo-textarea" placeholder="방송 중 기억할 내용이나 숫자, 미션 메모를 적어두세요."></textarea>
+      <textarea id="memoText" class="memo-textarea" placeholder="방송 중 확인할 메모를 적어두세요."></textarea>
       <div class="memo-footer">
-        <span id="memoSaveStatus" class="memo-status">저장된 메모가 표시됩니다.</span>
-        <div class="row-buttons wrap memo-actions">
-          <button id="memoSaveBtn" class="primary-btn" type="button">저장</button>
-          <button id="memoClearBtn" class="ghost-btn danger-soft" type="button">비우기</button>
+        <p id="memoSaveStatus" class="memo-status">저장된 메모가 없습니다.</p>
+        <div class="row-buttons memo-actions">
+          <button id="memoClearBtn" class="ghost-btn" type="button">비우기</button>
           <button id="memoCancelBtn" class="ghost-btn" type="button">닫기</button>
+          <button id="memoSaveBtn" class="primary-btn" type="button">저장</button>
         </div>
       </div>
-    </section>
+    </div>
+  </div>
+
+  <div id="cellEditModal" class="memo-modal cell-edit-modal" hidden>
+    <div class="memo-backdrop" data-cell-edit-close></div>
+    <div class="memo-dialog cell-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="cellEditTitle">
+      <div class="memo-head">
+        <div>
+          <p class="eyebrow">CELL EDIT</p>
+          <h2 id="cellEditTitle">빙고칸 수정</h2>
+        </div>
+        <button id="cellEditCloseBtn" class="memo-icon-btn" type="button" aria-label="칸 수정 닫기">×</button>
+      </div>
+      <div class="cell-edit-current">
+        <span>현재 내용</span>
+        <strong id="cellEditCurrent">-</strong>
+      </div>
+      <label class="cell-edit-label">
+        새 내용
+        <input id="cellEditInput" class="cell-edit-input" type="text" autocomplete="off" />
+      </label>
+      <p id="cellEditHelpText" class="help-text">빙고 종류에 맞는 값을 입력해 주세요.</p>
+      <div class="memo-footer">
+        <p class="memo-status">저장하면 메인/송출용 화면에 바로 반영돼요.</p>
+        <div class="row-buttons memo-actions">
+          <button id="cellEditCancelBtn" class="ghost-btn" type="button">취소</button>
+          <button id="cellEditSaveBtn" class="primary-btn" type="button">저장</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="./app.js"></script>

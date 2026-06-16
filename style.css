@@ -1575,3 +1575,100 @@ body.view-obs .memo-modal {
     justify-content: flex-start;
   }
 }
+
+/* 칸 수정 모드 */
+.edit-mode-panel .edit-mode-toggle {
+  width: 100%;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.edit-mode-toggle.is-on {
+  color: #fff;
+  background: linear-gradient(135deg, #64c7d9, #a08cff);
+  box-shadow: 0 14px 28px rgba(100, 199, 217, .22);
+}
+
+#editModeStatus.ok {
+  color: #4a8a8f;
+  background: rgba(195, 245, 250, .76);
+}
+
+#editModeStatus.warn {
+  color: #a27477;
+  background: rgba(255, 226, 234, .78);
+}
+
+body.cell-edit-mode .editor-help {
+  color: #4d8d9b;
+  background: rgba(224, 250, 255, .72);
+  border-color: rgba(108, 203, 219, .45);
+}
+
+body.cell-edit-mode .cell.admin-clickable {
+  cursor: text;
+  outline: 3px dashed rgba(97, 199, 217, .52);
+  outline-offset: -7px;
+}
+
+body.cell-edit-mode .cell.admin-clickable:hover {
+  transform: translateY(-3px) scale(1.015);
+  box-shadow: 0 16px 34px rgba(97, 199, 217, .26);
+}
+
+.cell-edit-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.cell-edit-current {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 199, .24);
+}
+
+.cell-edit-current span,
+.cell-edit-label {
+  color: #8d708f;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.cell-edit-current strong {
+  color: #5b4562;
+  font-size: 24px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.cell-edit-label {
+  display: grid;
+  gap: 8px;
+}
+
+.cell-edit-input {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid rgba(255,159,199,.36);
+  border-radius: 18px;
+  padding: 0 16px;
+  color: #5b4562;
+  background: rgba(255,255,255,.84);
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 950;
+  outline: none;
+  box-shadow: inset 0 2px 10px rgba(178,116,158,.08);
+}
+
+.cell-edit-input:focus {
+  border-color: rgba(105, 204, 219, .78);
+  box-shadow: 0 0 0 4px rgba(105,204,219,.16), inset 0 2px 10px rgba(178,116,158,.08);
+}
+
+body.view-obs .cell-edit-modal {
+  display: none !important;
+}
