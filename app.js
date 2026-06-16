@@ -702,7 +702,7 @@ function buildCells(size, contentType) {
   const count = validSize * validSize;
   const presetTexts = contentType === "number"
     ? makeRandomNumberTexts(count)
-    : contentType === "reset"
+    : (contentType === "alphabet" || contentType === "reset")
       ? makeRandomAlphabetTexts(count)
       : null;
 
