@@ -1411,3 +1411,35 @@ body.is-number-bingo .admin-cell-editor {
   line-height: .95;
   font-weight: 1000;
 }
+
+
+/* 현상금 숫자 표시 */
+.bounty-text {
+  min-height: 86px;
+  resize: vertical;
+  line-height: 1.5;
+  font-weight: 850;
+}
+
+.bounty-panel.is-muted {
+  opacity: .72;
+}
+
+.cell.bounty .cell-text {
+  color: #e83d4f !important;
+  text-shadow: 0 3px 12px rgba(232, 61, 79, .20);
+}
+
+.cell.bounty::after {
+  background:
+    radial-gradient(circle at 75% 22%, #ff6b7b 0 4px, transparent 4.5px),
+    radial-gradient(circle at 60% 36%, rgba(255, 180, 195, .68) 0 4px, transparent 4.5px);
+}
+
+.cell.bounty.cleared .cell-text {
+  color: #c66c78 !important;
+}
+
+body.view-obs .cell.bounty .cell-text {
+  text-shadow: 0 4px 16px rgba(232, 61, 79, .24);
+}

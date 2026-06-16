@@ -51,6 +51,7 @@ const stateDefaults = {
     line: 0,
     all: 0
   },
+  bountyNumbers: [],
   bingoCount: 0,
   completedLines: {},
   effectNonce: 0,
@@ -93,6 +94,11 @@ const els = {
   drawnCount: $("#drawnCount"),
   remainingDrawCount: $("#remainingDrawCount"),
   drawResultText: $("#drawResultText"),
+  bountyPanel: $("#bountyPanel"),
+  bountyInput: $("#bountyInput"),
+  bountyApplyBtn: $("#bountyApplyBtn"),
+  bountyClearBtn: $("#bountyClearBtn"),
+  bountyPreview: $("#bountyPreview"),
   chickenPreview: $("#chickenPreview"),
   chickenInput: $("#chickenInput"),
   chickenMinusBtn: $("#chickenMinusBtn"),
@@ -285,6 +291,7 @@ function bindEvents() {
   els.typeSelect.addEventListener("change", () => {
     syncSizeSelectForType(els.typeSelect.value);
     updateNumberDrawControls();
+    updateBountyPanelState();
     updateResetMenuAdminState();
   });
 
@@ -337,6 +344,26 @@ function bindEvents() {
 
   els.numberDrawBtn?.addEventListener("click", drawRandomNumber);
   els.resetDrawBtn?.addEventListener("click", resetNumberDrawHistory);
+
+  els.bountyApplyBtn?.addEventListener("click", () => {
+    const numbers = normalizeBountyNumbers(els.bountyInput?.value || "");
+    commitState((draft) => {
+      draft.bountyNumbers = numbers;
+    });
+  });
+
+  els.bountyClearBtn?.addEventListener("click", () => {
+    commitState((draft) => {
+      draft.bountyNumbers = [];
+    });
+  });
+
+  els.bountyInput?.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      els.bountyApplyBtn?.click();
+    }
+  });
 
   els.chickenMinusBtn.addEventListener("click", () => updateChicken(-1));
   els.chickenPlusBtn.addEventListener("click", () => updateChicken(1));
@@ -483,6 +510,36 @@ function updateNumberDrawControls() {
     : `${currentState.lastDrawnNumber}번 추첨! 현재 빙고판에는 없는 숫자예요.`;
 }
 
+function updateBountyPanelState() {
+  const selectedType = els.typeSelect?.value || currentState.contentType;
+  const isNumberMode = currentState.contentType === "number" || selectedType === "number";
+  const bountyNumbers = normalizeBountyNumbers(currentState.bountyNumbers);
+
+  if (els.bountyPanel) {
+    els.bountyPanel.classList.toggle("is-muted", !isNumberMode);
+  }
+
+  if (els.bountyInput) {
+    if (document.activeElement !== els.bountyInput) {
+      els.bountyInput.value = bountyNumbers.join(", ");
+    }
+    els.bountyInput.disabled = !isAdmin || activeView === "obs";
+  }
+
+  if (els.bountyApplyBtn) els.bountyApplyBtn.disabled = !isAdmin || activeView === "obs";
+  if (els.bountyClearBtn) els.bountyClearBtn.disabled = !isAdmin || activeView === "obs" || bountyNumbers.length === 0;
+  if (els.bountyPreview) els.bountyPreview.textContent = String(bountyNumbers.length);
+}
+
+function normalizeBountyNumbers(value) {
+  const source = Array.isArray(value) ? value.join(" ") : String(value || "");
+  return Array.from(new Set(source
+    .split(/[^0-9]+/g)
+    .map((number) => Number(number))
+    .filter((number) => Number.isInteger(number) && number >= 1 && number <= 100)))
+    .sort((a, b) => a - b);
+}
+
 function drawRandomNumber() {
   if (currentState.contentType !== "number") {
     alert("숫자 타입 빙고판에서만 사용할 수 있습니다.");
@@ -562,6 +619,7 @@ function render() {
 
   renderAdminLock();
   updateNumberDrawControls();
+  updateBountyPanelState();
   updateResetMenuAdminState();
   renderBoard();
   renderLines();
@@ -604,6 +662,9 @@ function renderAdminLock() {
     els.resetChecksBtn,
     els.numberDrawBtn,
     els.resetDrawBtn,
+    els.bountyInput,
+    els.bountyApplyBtn,
+    els.bountyClearBtn,
     els.chickenInput,
     els.chickenMinusBtn,
     els.chickenPlusBtn,
@@ -629,6 +690,7 @@ function renderBoard() {
   const completedCellIndexes = new Set(
     Object.values(currentState.completedLines || {}).flatMap((line) => line.cells)
   );
+  const bountySet = new Set(normalizeBountyNumbers(currentState.bountyNumbers));
 
   currentState.cells.forEach((cell, index) => {
     const cellEl = document.createElement("div");
@@ -637,6 +699,7 @@ function renderBoard() {
     cellEl.dataset.index = String(index);
     cellEl.classList.toggle("cleared", Boolean(cell.cleared));
     cellEl.classList.toggle("line-completed", completedCellIndexes.has(index));
+    cellEl.classList.toggle("bounty", currentState.contentType === "number" && bountySet.has(Number(cell.text)));
 
     const text = document.createElement("div");
     text.className = "cell-text";
@@ -773,6 +836,7 @@ function normalizeState(raw) {
     effectNonce: Number(raw?.effectNonce || 0),
     lastNewLines: Array.isArray(raw?.lastNewLines) ? raw.lastNewLines : [],
     drawnNumbers: normalizeDrawnNumbers(raw?.drawnNumbers),
+    bountyNumbers: normalizeBountyNumbers(raw?.bountyNumbers),
     lastDrawnNumber: normalizeLastDrawnNumber(raw?.lastDrawnNumber),
     lastDrawMatched: Boolean(raw?.lastDrawMatched),
     cells

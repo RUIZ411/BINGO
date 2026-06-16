@@ -124,6 +124,22 @@
           <p id="drawResultText" class="help-text">내용 타입이 숫자일 때 사용할 수 있어요.</p>
         </section>
 
+
+        <section class="panel-card admin-only bounty-panel" id="bountyPanel" data-admin-only>
+          <div class="panel-head">
+            <h2>현상금 숫자</h2>
+            <span class="draw-preview">🎯 <b id="bountyPreview">0</b></span>
+          </div>
+          <textarea id="bountyInput" class="bounty-text" placeholder="현상금 숫자를 입력하세요.
+예) 7, 25, 77
+예) 7 25 77"></textarea>
+          <div class="row-buttons wrap">
+            <button id="bountyApplyBtn" class="primary-btn">현상금 적용</button>
+            <button id="bountyClearBtn" class="ghost-btn">현상금 비우기</button>
+          </div>
+          <p class="help-text">입력한 숫자와 같은 빙고칸 숫자가 빨간색으로 표시됩니다. 1~100 숫자만 적용돼요.</p>
+        </section>
+
         <section class="panel-card admin-only" data-admin-only>
           <div class="panel-head">
             <h2>치킨 수</h2>
