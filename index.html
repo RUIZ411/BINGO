@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SUWEET BINGO </title>
+  <title>SUWEET BINGO</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
@@ -19,7 +19,7 @@
 
       <nav class="view-tabs" aria-label="화면 전환">
         <a href="?view=public" data-view-link="public">메인 화면</a>
-        <a href="?view=obs" data-view-link="obs">송출용 화면</a>
+        <a href="?view=obs" data-view-link="obs">OBS 화면</a>
       </nav>
     </header>
 
@@ -88,6 +88,7 @@
                 <option value="mission">미션</option>
                 <option value="number">숫자</option>
                 <option value="alphabet">알파벳</option>
+                <option value="reset">리셋</option>
               </select>
             </label>
           </div>
@@ -97,6 +98,7 @@
             <button id="shuffleBtn" class="ghost-btn">내용 랜덤 섞기</button>
             <button id="resetChecksBtn" class="ghost-btn danger-soft">체크 초기화</button>
           </div>
+          <p class="help-text">숫자 빙고는 5×5, 7×7, 10×10을 지원하고 미션/알파벳/리셋 빙고는 5×5로 고정됩니다.</p>
         </section>
 
 
@@ -194,8 +196,8 @@
         </div>
       </section>
 
-      <aside class="obs-scale-panel" id="obsScalePanel" aria-label="송출용 화면 확대 축소" hidden>
-        <p>송출용 비율</p>
+      <aside class="obs-scale-panel" id="obsScalePanel" aria-label="OBS 화면 확대 축소" hidden>
+        <p>OBS 비율</p>
         <button type="button" data-obs-scale="1">100%</button>
         <button type="button" data-obs-scale="0.8">80%</button>
         <button type="button" data-obs-scale="0.67">67%</button>

@@ -37,6 +37,8 @@ const LOCAL_STORAGE_KEY = "bkg-bingo-v1-state";
 const OBS_SCALE_STORAGE_KEY = "bkg-bingo-obs-scale";
 const LOCAL_ADMIN_PIN = "1234";
 const ADMIN_EMAIL_DOMAIN = "@suweet.com";
+const BINGO_TYPES = ["mission", "number", "alphabet", "reset"];
+const NUMBER_BINGO_SIZES = [5, 7, 10];
 
 
 const stateDefaults = {
@@ -265,12 +267,18 @@ function bindEvents() {
   });
 
   els.typeSelect.addEventListener("change", () => {
+    syncSizeSelectForType(els.typeSelect.value);
     updateNumberDrawControls();
   });
 
+  els.sizeSelect.addEventListener("change", () => {
+    const validSize = getValidSizeForType(els.typeSelect.value, Number(els.sizeSelect.value));
+    els.sizeSelect.value = String(validSize);
+  });
+
   els.createBoardBtn.addEventListener("click", () => {
-    const size = Number(els.sizeSelect.value);
     const contentType = els.typeSelect.value;
+    const size = getValidSizeForType(contentType, Number(els.sizeSelect.value));
     commitState((draft) => {
       draft.size = size;
       draft.contentType = contentType;
@@ -352,6 +360,27 @@ function bindEvents() {
       Object.assign(draft, fresh);
     });
   });
+}
+
+function getAllowedSizesForType(contentType) {
+  return contentType === "number" ? NUMBER_BINGO_SIZES : [5];
+}
+
+function getValidSizeForType(contentType, size) {
+  const allowed = getAllowedSizesForType(contentType);
+  const numericSize = Number(size);
+  return allowed.includes(numericSize) ? numericSize : allowed[0];
+}
+
+function syncSizeSelectForType(contentType, requestedSize = Number(els.sizeSelect?.value || currentState.size)) {
+  if (!els.sizeSelect) return;
+  const allowed = getAllowedSizesForType(contentType);
+  const nextSize = getValidSizeForType(contentType, requestedSize);
+
+  els.sizeSelect.innerHTML = allowed
+    .map((size) => `<option value="${size}">${size} × ${size}</option>`)
+    .join("");
+  els.sizeSelect.value = String(nextSize);
 }
 
 function makeLoginEmail(value) {
@@ -453,8 +482,8 @@ function render() {
   if (els.pageTitle) els.pageTitle.textContent = getViewTitle();
   if (els.boardTitle) els.boardTitle.textContent = currentState.title;
   if (els.titleInput) els.titleInput.value = currentState.title;
-  if (els.sizeSelect) els.sizeSelect.value = String(currentState.size);
   if (els.typeSelect) els.typeSelect.value = currentState.contentType;
+  syncSizeSelectForType(currentState.contentType, currentState.size);
   if (els.chickenInput) els.chickenInput.value = String(currentState.chickenCount);
   if (els.chickenPreview) els.chickenPreview.textContent = currentState.chickenCount;
   if (els.bingoCount) els.bingoCount.textContent = currentState.bingoCount;
@@ -492,7 +521,6 @@ function renderAdminLock() {
   const shouldDisable = activeView !== "obs" && !isAdmin;
   [
     els.titleInput,
-    els.sizeSelect,
     els.typeSelect,
     els.createBoardBtn,
     els.shuffleBtn,
@@ -509,6 +537,10 @@ function renderAdminLock() {
   ].forEach((el) => {
     if (el) el.disabled = shouldDisable;
   });
+
+  if (els.sizeSelect) {
+    els.sizeSelect.disabled = shouldDisable || getAllowedSizesForType(els.typeSelect?.value || currentState.contentType).length === 1;
+  }
 }
 
 function renderBoard() {
@@ -638,8 +670,8 @@ function makeInitialState() {
 }
 
 function normalizeState(raw) {
-  const size = [5, 7, 10].includes(Number(raw?.size)) ? Number(raw.size) : 5;
-  const contentType = ["mission", "number", "alphabet"].includes(raw?.contentType) ? raw.contentType : "mission";
+  const contentType = BINGO_TYPES.includes(raw?.contentType) ? raw.contentType : "mission";
+  const size = getValidSizeForType(contentType, Number(raw?.size));
   const cells = Array.isArray(raw?.cells) && raw.cells.length === size * size
     ? raw.cells.map((cell, index) => ({
         id: cell.id || `cell_${index}`,
@@ -666,25 +698,35 @@ function normalizeState(raw) {
 }
 
 function buildCells(size, contentType) {
-  const count = size * size;
-  const numberTexts = contentType === "number" ? makeRandomNumberTexts(count) : null;
+  const validSize = getValidSizeForType(contentType, size);
+  const count = validSize * validSize;
+  const presetTexts = contentType === "number"
+    ? makeRandomNumberTexts(count)
+    : contentType === "reset"
+      ? makeRandomAlphabetTexts(count)
+      : null;
 
   return Array.from({ length: count }, (_, index) => ({
     id: `cell_${index}`,
     index,
-    text: numberTexts ? numberTexts[index] : makeCellText(index, contentType),
+    text: presetTexts ? presetTexts[index] : makeCellText(index, contentType),
     cleared: false
   }));
 }
 
 function makeCellText(index, contentType) {
   if (contentType === "number") return String(index + 1);
-  if (contentType === "alphabet") return excelColumnName(index + 1);
+  if (contentType === "alphabet") return String.fromCharCode(65 + (index % 26));
+  if (contentType === "reset") return makeRandomAlphabetTexts(25)[index] || "A";
   return `미션 ${index + 1}`;
 }
 
 function makeRandomNumberTexts(count) {
   return shuffleArray(Array.from({ length: 100 }, (_, index) => String(index + 1))).slice(0, count);
+}
+
+function makeRandomAlphabetTexts(count) {
+  return shuffleArray(Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index))).slice(0, count);
 }
 
 function excelColumnName(number) {
