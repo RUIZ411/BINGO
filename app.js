@@ -767,15 +767,11 @@ function updateNumberDrawControls() {
 }
 
 function updateBountyPanelState() {
-  const selectedType = els.typeSelect?.value || currentState.contentType;
-  const isNumberMode = currentState.contentType === "number" || selectedType === "number";
   const bounties = normalizeBounties(currentState.bounties, currentState.bountyNumbers);
-  const entries = Object.entries(bounties)
-    .map(([number, amount]) => [Number(number), Number(amount)])
-    .sort((a, b) => a[0] - b[0]);
+  const entries = sortBountyEntries(Object.entries(bounties));
 
   if (els.bountyPanel) {
-    els.bountyPanel.classList.toggle("is-muted", !isNumberMode);
+    els.bountyPanel.classList.remove("is-muted");
   }
 
   [els.bountyNumberInput, els.bountyAmountInput].forEach((input) => {
@@ -795,19 +791,19 @@ function updateBountyPanelState() {
       empty.textContent = "등록된 현상금이 없습니다.";
       els.bountyList.append(empty);
     } else {
-      entries.forEach(([number, amount]) => {
+      entries.forEach(([target, amount]) => {
         const item = document.createElement("div");
         item.className = "bounty-item";
 
         const label = document.createElement("span");
-        label.innerHTML = `<strong>${number}</strong>번 <b>${formatBountyAmount(amount)}</b>개`;
+        label.innerHTML = `<strong>${escapeHtml(target)}</strong> <b>${formatBountyAmount(amount)}</b>개`;
 
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
         removeBtn.className = "bounty-remove";
         removeBtn.textContent = "삭제";
         removeBtn.disabled = !isAdmin || activeView === "obs";
-        removeBtn.addEventListener("click", () => removeBounty(number));
+        removeBtn.addEventListener("click", () => removeBounty(target));
 
         item.append(label, removeBtn);
         els.bountyList.append(item);
@@ -817,11 +813,11 @@ function updateBountyPanelState() {
 }
 
 function addOrUpdateBounty() {
-  const targetNumber = Number(els.bountyNumberInput?.value || 0);
+  const target = normalizeBountyTarget(els.bountyNumberInput?.value || "");
   const amount = Number(els.bountyAmountInput?.value || 0);
 
-  if (!Number.isInteger(targetNumber) || targetNumber < 1 || targetNumber > 100) {
-    alert("현상금 숫자는 1~100 사이의 정수로 입력해 주세요.");
+  if (!target) {
+    alert("현상금을 걸 대상 칸 내용을 입력해 주세요.");
     els.bountyNumberInput?.focus();
     return;
   }
@@ -832,15 +828,21 @@ function addOrUpdateBounty() {
     return;
   }
 
+  const existsInBoard = currentState.cells.some((cell) => normalizeBountyTarget(cell.text) === target);
+  if (!existsInBoard) {
+    const proceed = confirm("현재 빙고판에 같은 내용의 칸이 없습니다. 그래도 현상금으로 등록할까요?");
+    if (!proceed) return;
+  }
+
   commitState((draft) => {
     const next = normalizeBounties(draft.bounties, draft.bountyNumbers);
     if (amount === 0) {
-      delete next[targetNumber];
+      delete next[target];
     } else {
-      next[targetNumber] = amount;
+      next[target] = amount;
     }
     draft.bounties = next;
-    draft.bountyNumbers = Object.keys(next).map(Number).sort((a, b) => a - b);
+    draft.bountyNumbers = Object.keys(next);
   });
 
   if (els.bountyNumberInput) els.bountyNumberInput.value = "";
@@ -848,51 +850,133 @@ function addOrUpdateBounty() {
   els.bountyNumberInput?.focus();
 }
 
-function removeBounty(targetNumber) {
+function removeBounty(target) {
   commitState((draft) => {
+    const normalizedTarget = normalizeBountyTarget(target);
     const next = normalizeBounties(draft.bounties, draft.bountyNumbers);
-    delete next[Number(targetNumber)];
+    delete next[normalizedTarget];
     draft.bounties = next;
-    draft.bountyNumbers = Object.keys(next).map(Number).sort((a, b) => a - b);
+    draft.bountyNumbers = Object.keys(next);
   });
 }
 
 function normalizeBounties(value, legacyNumbers = []) {
   const result = {};
 
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    Object.entries(value).forEach(([numberKey, amountValue]) => {
-      const number = Number(numberKey);
-      const amount = Number(amountValue);
-      if (Number.isInteger(number) && number >= 1 && number <= 100 && Number.isInteger(amount) && amount > 0) {
-        result[number] = amount;
+  if (Array.isArray(value)) {
+    value.forEach((entry) => {
+      const target = normalizeBountyTarget(entry?.target ?? entry?.number ?? entry?.text ?? "");
+      const amount = Number(entry?.amount ?? entry?.count ?? 0);
+      if (target && Number.isInteger(amount) && amount > 0) result[target] = amount;
+    });
+  } else if (value && typeof value === "object") {
+    Object.entries(value).forEach(([rawKey, rawValue]) => {
+      let target = "";
+      let amount = 0;
+
+      if (rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)) {
+        target = normalizeBountyTarget(rawValue.target ?? rawValue.number ?? rawValue.text ?? decodeBountyStorageKey(rawKey));
+        amount = Number(rawValue.amount ?? rawValue.count ?? 0);
+      } else {
+        target = normalizeBountyTarget(decodeBountyStorageKey(rawKey));
+        amount = Number(rawValue);
       }
+
+      if (target && Number.isInteger(amount) && amount > 0) result[target] = amount;
     });
   }
 
-  normalizeBountyNumbers(legacyNumbers).forEach((number) => {
-    if (!result[number]) result[number] = 1;
+  normalizeBountyNumbers(legacyNumbers).forEach((target) => {
+    if (!result[target]) result[target] = 1;
   });
 
-  return Object.fromEntries(
-    Object.entries(result).sort((a, b) => Number(a[0]) - Number(b[0]))
-  );
+  return Object.fromEntries(sortBountyEntries(Object.entries(result)));
 }
 
 function normalizeBountyNumbers(value) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
-    return Object.keys(value)
-      .map((number) => Number(number))
-      .filter((number) => Number.isInteger(number) && number >= 1 && number <= 100)
-      .sort((a, b) => a - b);
+    return Object.keys(normalizeBounties(value));
   }
 
-  const source = Array.isArray(value) ? value.join(" ") : String(value || "");
+  const source = Array.isArray(value) ? value.join("
+") : String(value || "");
   return Array.from(new Set(source
-    .split(/[^0-9]+/g)
-    .map((number) => Number(number))
-    .filter((number) => Number.isInteger(number) && number >= 1 && number <= 100)))
-    .sort((a, b) => a - b);
+    .split(/[
+,]+/g)
+    .map((target) => normalizeBountyTarget(target))
+    .filter(Boolean)));
+}
+
+
+function normalizeBountyTarget(value) {
+  const raw = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (!raw) return "";
+
+  if (/^\d+$/.test(raw)) {
+    return String(Number(raw));
+  }
+
+  if (/^[a-z]$/i.test(raw)) {
+    return raw.toUpperCase();
+  }
+
+  return raw;
+}
+
+function sortBountyEntries(entries) {
+  return [...entries].sort(([a], [b]) => {
+    const aNumber = /^\d+$/.test(a) ? Number(a) : null;
+    const bNumber = /^\d+$/.test(b) ? Number(b) : null;
+
+    if (aNumber != null && bNumber != null) return aNumber - bNumber;
+    if (aNumber != null) return -1;
+    if (bNumber != null) return 1;
+    return String(a).localeCompare(String(b), "ko-KR", { numeric: true });
+  });
+}
+
+function encodeBountyStorageKey(target) {
+  const normalized = normalizeBountyTarget(target);
+  return encodeURIComponent(normalized)
+    .replace(/\./g, "%2E")
+    .replace(/!/g, "%21")
+    .replace(/~/g, "%7E")
+    .replace(/\*/g, "%2A")
+    .replace(/'/g, "%27")
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29");
+}
+
+function decodeBountyStorageKey(key) {
+  const value = String(key ?? "");
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function encodeBountiesForStorage(value) {
+  const normalized = normalizeBounties(value);
+  const result = {};
+  sortBountyEntries(Object.entries(normalized)).forEach(([target, amount]) => {
+    const key = encodeBountyStorageKey(target);
+    if (!key) return;
+    result[key] = {
+      target,
+      amount: Number(amount)
+    };
+  });
+  return result;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function formatBountyAmount(value) {
@@ -1072,7 +1156,8 @@ function renderBoard() {
     cellEl.dataset.index = String(index);
     cellEl.classList.toggle("cleared", Boolean(cell.cleared));
     cellEl.classList.toggle("line-completed", completedCellIndexes.has(index));
-    const bountyAmount = currentState.contentType === "number" ? bounties[Number(cell.text)] : null;
+    const bountyTarget = normalizeBountyTarget(cell.text);
+    const bountyAmount = bountyTarget ? bounties[bountyTarget] : null;
     const hasBounty = Number.isFinite(Number(bountyAmount)) && Number(bountyAmount) > 0;
     cellEl.classList.toggle("bounty", hasBounty);
 
@@ -1187,7 +1272,7 @@ async function saveWholeState(nextState) {
     }
 
     try {
-      await set(roomRef, currentState);
+      await set(roomRef, prepareStateForStorage(currentState));
     } catch (error) {
       console.error("Firebase 저장 실패", error);
       alert("Firebase 저장에 실패했습니다. Realtime Database URL, Database 생성 여부, Rules 권한을 확인해 주세요. 화면에는 임시로 반영됐지만 새로고침하면 사라질 수 있습니다.");
@@ -1196,6 +1281,14 @@ async function saveWholeState(nextState) {
   }
 
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentState));
+}
+
+function prepareStateForStorage(state) {
+  return {
+    ...state,
+    bounties: encodeBountiesForStorage(state.bounties),
+    bountyNumbers: Object.keys(normalizeBounties(state.bounties))
+  };
 }
 
 function makeInitialState() {
@@ -1228,7 +1321,7 @@ function normalizeState(raw) {
     effectNonce: Number(raw?.effectNonce || 0),
     lastNewLines: Array.isArray(raw?.lastNewLines) ? raw.lastNewLines : [],
     drawnNumbers: normalizeDrawnNumbers(raw?.drawnNumbers),
-    bountyNumbers: normalizeBountyNumbers(normalizeBounties(raw?.bounties, raw?.bountyNumbers)),
+    bountyNumbers: Object.keys(normalizeBounties(raw?.bounties, raw?.bountyNumbers)),
     memoText: String(raw?.memoText || ""),
     lastDrawnNumber: normalizeLastDrawnNumber(raw?.lastDrawnNumber),
     lastDrawMatched: Boolean(raw?.lastDrawMatched),

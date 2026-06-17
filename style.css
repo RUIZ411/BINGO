@@ -1765,12 +1765,12 @@ body.view-obs .cell-edit-modal {
   cursor: not-allowed;
 }
 
-body.is-number-bingo .cell.bounty {
+.cell.bounty {
   justify-content: center;
   gap: 2px;
 }
 
-body.is-number-bingo .cell.bounty .cell-text {
+.cell.bounty .cell-text {
   flex: 0 0 auto;
   color: #e83d4f !important;
   text-shadow: 0 3px 12px rgba(232, 61, 79, .20);
@@ -1806,7 +1806,7 @@ body.view-obs .bounty-amount-long { font-size: 18px; }
   filter: grayscale(.12);
 }
 
-body.is-number-bingo.view-obs .cell.bounty .cell-text {
+body.view-obs .cell.bounty .cell-text {
   text-shadow: 0 4px 16px rgba(232, 61, 79, .24);
 }
 
@@ -1842,4 +1842,26 @@ body.is-letter-bingo .admin-cell-editor {
 body.is-letter-bingo .cell.cleared .cell-text,
 body.is-letter-bingo .cell.line-completed .cell-text {
   opacity: .42;
+}
+
+
+/* 모든 빙고 타입 공통 현상금 표시 */
+.cell.bounty .cell-text {
+  flex: 0 0 auto;
+}
+
+.cell.bounty.text-long .cell-text,
+.cell.bounty.text-xlong .cell-text {
+  line-height: 1.04;
+}
+
+.cell.bounty.text-long .bounty-amount,
+.cell.bounty.text-xlong .bounty-amount {
+  font-size: 15px;
+  margin-top: 3px;
+}
+
+body.view-obs .cell.bounty.text-long .bounty-amount,
+body.view-obs .cell.bounty.text-xlong .bounty-amount {
+  font-size: 16px;
 }
