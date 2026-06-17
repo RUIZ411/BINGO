@@ -898,11 +898,9 @@ function normalizeBountyNumbers(value) {
     return Object.keys(normalizeBounties(value));
   }
 
-  const source = Array.isArray(value) ? value.join("
-") : String(value || "");
+  const source = Array.isArray(value) ? value.join("\n") : String(value || "");
   return Array.from(new Set(source
-    .split(/[
-,]+/g)
+    .split(/[\n,]+/g)
     .map((target) => normalizeBountyTarget(target))
     .filter(Boolean)));
 }
