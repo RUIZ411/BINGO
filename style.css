@@ -1809,3 +1809,37 @@ body.view-obs .bounty-amount-long { font-size: 18px; }
 body.is-number-bingo.view-obs .cell.bounty .cell-text {
   text-shadow: 0 4px 16px rgba(232, 61, 79, .24);
 }
+
+
+/* 알파벳/리셋 빙고 전용: 한 글자 폰트 박스 채움 */
+body.is-letter-bingo .cell .cell-text {
+  display: block;
+  width: 100%;
+  max-height: none;
+  padding: 0 2px;
+  overflow: visible;
+  color: #5a435d;
+  font-size: 60px;
+  line-height: .9;
+  letter-spacing: -0.035em;
+  font-weight: 1000;
+  transform: translateY(1px);
+  -webkit-line-clamp: unset;
+  text-shadow: 0 1px 0 rgba(255,255,255,.95), 0 7px 16px rgba(96, 71, 95, .08);
+}
+
+body.is-letter-bingo.view-obs .cell .cell-text {
+  font-size: 64px;
+  line-height: .88;
+}
+
+body.is-letter-bingo .admin-cell-editor {
+  font-size: 34px;
+  line-height: .95;
+  font-weight: 1000;
+}
+
+body.is-letter-bingo .cell.cleared .cell-text,
+body.is-letter-bingo .cell.line-completed .cell-text {
+  opacity: .42;
+}

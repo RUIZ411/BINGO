@@ -963,9 +963,11 @@ function render() {
   syncSizeSelectForType(currentState.contentType, currentState.size);
   const isResetBingo = currentState.contentType === "reset";
   const isNumberBingo = currentState.contentType === "number";
+  const isLetterBingo = currentState.contentType === "alphabet" || currentState.contentType === "reset";
   const resetRewards = normalizeResetRewards(currentState.resetRewards);
   document.body.classList.toggle("is-reset-bingo", isResetBingo);
   document.body.classList.toggle("is-number-bingo", isNumberBingo);
+  document.body.classList.toggle("is-letter-bingo", isLetterBingo);
 
   if (els.chickenInput) els.chickenInput.value = String(currentState.chickenCount);
   if (els.chickenPreview) els.chickenPreview.textContent = currentState.chickenCount;
