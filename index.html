@@ -130,14 +130,22 @@
             <h2>현상금 숫자</h2>
             <span class="draw-preview">🎯 <b id="bountyPreview">0</b></span>
           </div>
-          <textarea id="bountyInput" class="bounty-text" placeholder="현상금 숫자를 입력하세요.
-예) 7, 25, 77
-예) 7 25 77"></textarea>
+          <div class="bounty-form-grid">
+            <label>
+              숫자
+              <input id="bountyNumberInput" type="number" min="1" max="100" step="1" placeholder="예: 25" />
+            </label>
+            <label>
+              개수
+              <input id="bountyAmountInput" type="number" min="0" step="1" placeholder="예: 300" />
+            </label>
+          </div>
           <div class="row-buttons wrap">
-            <button id="bountyApplyBtn" class="primary-btn">현상금 적용</button>
+            <button id="bountyAddBtn" class="primary-btn">추가 / 수정</button>
             <button id="bountyClearBtn" class="ghost-btn">현상금 비우기</button>
           </div>
-          <p class="help-text">입력한 숫자와 같은 빙고칸 숫자가 빨간색으로 표시됩니다. 1~100 숫자만 적용돼요.</p>
+          <div id="bountyList" class="bounty-list" aria-live="polite"></div>
+          <p class="help-text">숫자 빙고에서 현상금 숫자는 빨간색으로 표시되고, 숫자 아래에 개수가 함께 표시됩니다.</p>
         </section>
         <section class="panel-card admin-only edit-mode-panel" id="editModePanel" data-admin-only>
           <div class="panel-head">

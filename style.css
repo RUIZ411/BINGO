@@ -1672,3 +1672,140 @@ body.cell-edit-mode .cell.admin-clickable:hover {
 body.view-obs .cell-edit-modal {
   display: none !important;
 }
+
+/* 현상금 숫자 + 개수 표시 확장 */
+.bounty-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 10px 0 12px;
+}
+
+.bounty-form-grid label {
+  display: grid;
+  gap: 6px;
+  color: #7a5d7d;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.bounty-form-grid input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 159, 199, .32);
+  background: rgba(255,255,255,.78);
+  color: #60475f;
+  font-size: 15px;
+  font-weight: 950;
+  outline: none;
+}
+
+.bounty-form-grid input:focus {
+  border-color: rgba(255, 127, 172, .72);
+  box-shadow: 0 0 0 4px rgba(255, 159, 199, .16);
+}
+
+.bounty-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.bounty-empty {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.55);
+  color: #9a7d9d;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.bounty-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 15px;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(255, 159, 199, .22);
+  color: #735574;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.bounty-item strong {
+  color: #e83d4f;
+  font-size: 16px;
+}
+
+.bounty-item b {
+  color: #e83d4f;
+}
+
+.bounty-remove {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: rgba(232, 61, 79, .10);
+  color: #d73b4b;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.bounty-remove:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+body.is-number-bingo .cell.bounty {
+  justify-content: center;
+  gap: 2px;
+}
+
+body.is-number-bingo .cell.bounty .cell-text {
+  flex: 0 0 auto;
+  color: #e83d4f !important;
+  text-shadow: 0 3px 12px rgba(232, 61, 79, .20);
+}
+
+.bounty-amount {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  width: calc(100% - 12px);
+  margin-top: 0;
+  text-align: center;
+  color: #e83d4f;
+  font-weight: 1000;
+  line-height: .95;
+  letter-spacing: -0.045em;
+  text-shadow: 0 1px 0 rgba(255,255,255,.9), 0 2px 9px rgba(232, 61, 79, .14);
+  pointer-events: none;
+}
+
+.bounty-amount-short { font-size: 23px; }
+.bounty-amount-medium { font-size: 20px; }
+.bounty-amount-long { font-size: 17px; }
+
+body.view-obs .bounty-amount-short { font-size: 24px; }
+body.view-obs .bounty-amount-medium { font-size: 21px; }
+body.view-obs .bounty-amount-long { font-size: 18px; }
+
+.cell.cleared .bounty-amount,
+.cell.line-completed .bounty-amount {
+  opacity: .32;
+  text-decoration: line-through;
+  filter: grayscale(.12);
+}
+
+body.is-number-bingo.view-obs .cell.bounty .cell-text {
+  text-shadow: 0 4px 16px rgba(232, 61, 79, .24);
+}

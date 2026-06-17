@@ -52,6 +52,7 @@ const stateDefaults = {
     all: 0
   },
   bountyNumbers: [],
+  bounties: {},
   memoText: "",
   bingoCount: 0,
   completedLines: {},
@@ -96,9 +97,11 @@ const els = {
   remainingDrawCount: $("#remainingDrawCount"),
   drawResultText: $("#drawResultText"),
   bountyPanel: $("#bountyPanel"),
-  bountyInput: $("#bountyInput"),
-  bountyApplyBtn: $("#bountyApplyBtn"),
+  bountyNumberInput: $("#bountyNumberInput"),
+  bountyAmountInput: $("#bountyAmountInput"),
+  bountyAddBtn: $("#bountyAddBtn"),
   bountyClearBtn: $("#bountyClearBtn"),
+  bountyList: $("#bountyList"),
   bountyPreview: $("#bountyPreview"),
   chickenPreview: $("#chickenPreview"),
   chickenInput: $("#chickenInput"),
@@ -443,24 +446,23 @@ function bindEvents() {
   els.numberDrawBtn?.addEventListener("click", drawRandomNumber);
   els.resetDrawBtn?.addEventListener("click", resetNumberDrawHistory);
 
-  els.bountyApplyBtn?.addEventListener("click", () => {
-    const numbers = normalizeBountyNumbers(els.bountyInput?.value || "");
-    commitState((draft) => {
-      draft.bountyNumbers = numbers;
-    });
-  });
+  els.bountyAddBtn?.addEventListener("click", addOrUpdateBounty);
 
   els.bountyClearBtn?.addEventListener("click", () => {
+    if (!confirm("현상금을 모두 비울까요?")) return;
     commitState((draft) => {
+      draft.bounties = {};
       draft.bountyNumbers = [];
     });
   });
 
-  els.bountyInput?.addEventListener("keydown", (event) => {
-    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-      event.preventDefault();
-      els.bountyApplyBtn?.click();
-    }
+  [els.bountyNumberInput, els.bountyAmountInput].forEach((input) => {
+    input?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addOrUpdateBounty();
+      }
+    });
   });
 
   els.chickenMinusBtn.addEventListener("click", () => updateChicken(-1));
@@ -767,31 +769,142 @@ function updateNumberDrawControls() {
 function updateBountyPanelState() {
   const selectedType = els.typeSelect?.value || currentState.contentType;
   const isNumberMode = currentState.contentType === "number" || selectedType === "number";
-  const bountyNumbers = normalizeBountyNumbers(currentState.bountyNumbers);
+  const bounties = normalizeBounties(currentState.bounties, currentState.bountyNumbers);
+  const entries = Object.entries(bounties)
+    .map(([number, amount]) => [Number(number), Number(amount)])
+    .sort((a, b) => a[0] - b[0]);
 
   if (els.bountyPanel) {
     els.bountyPanel.classList.toggle("is-muted", !isNumberMode);
   }
 
-  if (els.bountyInput) {
-    if (document.activeElement !== els.bountyInput) {
-      els.bountyInput.value = bountyNumbers.join(", ");
+  [els.bountyNumberInput, els.bountyAmountInput].forEach((input) => {
+    if (input) input.disabled = !isAdmin || activeView === "obs";
+  });
+
+  if (els.bountyAddBtn) els.bountyAddBtn.disabled = !isAdmin || activeView === "obs";
+  if (els.bountyClearBtn) els.bountyClearBtn.disabled = !isAdmin || activeView === "obs" || entries.length === 0;
+  if (els.bountyPreview) els.bountyPreview.textContent = String(entries.length);
+
+  if (els.bountyList) {
+    els.bountyList.innerHTML = "";
+
+    if (entries.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "bounty-empty";
+      empty.textContent = "등록된 현상금이 없습니다.";
+      els.bountyList.append(empty);
+    } else {
+      entries.forEach(([number, amount]) => {
+        const item = document.createElement("div");
+        item.className = "bounty-item";
+
+        const label = document.createElement("span");
+        label.innerHTML = `<strong>${number}</strong>번 <b>${formatBountyAmount(amount)}</b>개`;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "bounty-remove";
+        removeBtn.textContent = "삭제";
+        removeBtn.disabled = !isAdmin || activeView === "obs";
+        removeBtn.addEventListener("click", () => removeBounty(number));
+
+        item.append(label, removeBtn);
+        els.bountyList.append(item);
+      });
     }
-    els.bountyInput.disabled = !isAdmin || activeView === "obs";
+  }
+}
+
+function addOrUpdateBounty() {
+  const targetNumber = Number(els.bountyNumberInput?.value || 0);
+  const amount = Number(els.bountyAmountInput?.value || 0);
+
+  if (!Number.isInteger(targetNumber) || targetNumber < 1 || targetNumber > 100) {
+    alert("현상금 숫자는 1~100 사이의 정수로 입력해 주세요.");
+    els.bountyNumberInput?.focus();
+    return;
   }
 
-  if (els.bountyApplyBtn) els.bountyApplyBtn.disabled = !isAdmin || activeView === "obs";
-  if (els.bountyClearBtn) els.bountyClearBtn.disabled = !isAdmin || activeView === "obs" || bountyNumbers.length === 0;
-  if (els.bountyPreview) els.bountyPreview.textContent = String(bountyNumbers.length);
+  if (!Number.isInteger(amount) || amount < 0) {
+    alert("현상금 개수는 0 이상의 정수로 입력해 주세요.");
+    els.bountyAmountInput?.focus();
+    return;
+  }
+
+  commitState((draft) => {
+    const next = normalizeBounties(draft.bounties, draft.bountyNumbers);
+    if (amount === 0) {
+      delete next[targetNumber];
+    } else {
+      next[targetNumber] = amount;
+    }
+    draft.bounties = next;
+    draft.bountyNumbers = Object.keys(next).map(Number).sort((a, b) => a - b);
+  });
+
+  if (els.bountyNumberInput) els.bountyNumberInput.value = "";
+  if (els.bountyAmountInput) els.bountyAmountInput.value = "";
+  els.bountyNumberInput?.focus();
+}
+
+function removeBounty(targetNumber) {
+  commitState((draft) => {
+    const next = normalizeBounties(draft.bounties, draft.bountyNumbers);
+    delete next[Number(targetNumber)];
+    draft.bounties = next;
+    draft.bountyNumbers = Object.keys(next).map(Number).sort((a, b) => a - b);
+  });
+}
+
+function normalizeBounties(value, legacyNumbers = []) {
+  const result = {};
+
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    Object.entries(value).forEach(([numberKey, amountValue]) => {
+      const number = Number(numberKey);
+      const amount = Number(amountValue);
+      if (Number.isInteger(number) && number >= 1 && number <= 100 && Number.isInteger(amount) && amount > 0) {
+        result[number] = amount;
+      }
+    });
+  }
+
+  normalizeBountyNumbers(legacyNumbers).forEach((number) => {
+    if (!result[number]) result[number] = 1;
+  });
+
+  return Object.fromEntries(
+    Object.entries(result).sort((a, b) => Number(a[0]) - Number(b[0]))
+  );
 }
 
 function normalizeBountyNumbers(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return Object.keys(value)
+      .map((number) => Number(number))
+      .filter((number) => Number.isInteger(number) && number >= 1 && number <= 100)
+      .sort((a, b) => a - b);
+  }
+
   const source = Array.isArray(value) ? value.join(" ") : String(value || "");
   return Array.from(new Set(source
     .split(/[^0-9]+/g)
     .map((number) => Number(number))
     .filter((number) => Number.isInteger(number) && number >= 1 && number <= 100)))
     .sort((a, b) => a - b);
+}
+
+function formatBountyAmount(value) {
+  const number = Math.max(0, Number(value || 0));
+  return Number.isFinite(number) ? number.toLocaleString("ko-KR") : "0";
+}
+
+function getBountyAmountClass(value) {
+  const length = String(Math.max(0, Number(value || 0))).length;
+  if (length <= 3) return "bounty-amount-short";
+  if (length <= 5) return "bounty-amount-medium";
+  return "bounty-amount-long";
 }
 
 function drawRandomNumber() {
@@ -918,8 +1031,9 @@ function renderAdminLock() {
     els.resetChecksBtn,
     els.numberDrawBtn,
     els.resetDrawBtn,
-    els.bountyInput,
-    els.bountyApplyBtn,
+    els.bountyNumberInput,
+    els.bountyAmountInput,
+    els.bountyAddBtn,
     els.bountyClearBtn,
     els.chickenInput,
     els.chickenMinusBtn,
@@ -947,7 +1061,7 @@ function renderBoard() {
   const completedCellIndexes = new Set(
     Object.values(currentState.completedLines || {}).flatMap((line) => line.cells)
   );
-  const bountySet = new Set(normalizeBountyNumbers(currentState.bountyNumbers));
+  const bounties = normalizeBounties(currentState.bounties, currentState.bountyNumbers);
 
   currentState.cells.forEach((cell, index) => {
     const cellEl = document.createElement("div");
@@ -956,12 +1070,21 @@ function renderBoard() {
     cellEl.dataset.index = String(index);
     cellEl.classList.toggle("cleared", Boolean(cell.cleared));
     cellEl.classList.toggle("line-completed", completedCellIndexes.has(index));
-    cellEl.classList.toggle("bounty", currentState.contentType === "number" && bountySet.has(Number(cell.text)));
+    const bountyAmount = currentState.contentType === "number" ? bounties[Number(cell.text)] : null;
+    const hasBounty = Number.isFinite(Number(bountyAmount)) && Number(bountyAmount) > 0;
+    cellEl.classList.toggle("bounty", hasBounty);
 
     const text = document.createElement("div");
     text.className = "cell-text";
     text.textContent = cell.text;
     cellEl.append(text);
+
+    if (hasBounty) {
+      const amount = document.createElement("div");
+      amount.className = `bounty-amount ${getBountyAmountClass(bountyAmount)}`;
+      amount.textContent = formatBountyAmount(bountyAmount);
+      cellEl.append(amount);
+    }
 
     if (activeView !== "obs" && isAdmin) {
       cellEl.classList.add("admin-clickable");
@@ -1099,10 +1222,11 @@ function normalizeState(raw) {
     contentType,
     chickenCount: Math.max(0, Number(raw?.chickenCount || 0)),
     resetRewards: normalizeResetRewards(raw?.resetRewards),
+    bounties: normalizeBounties(raw?.bounties, raw?.bountyNumbers),
     effectNonce: Number(raw?.effectNonce || 0),
     lastNewLines: Array.isArray(raw?.lastNewLines) ? raw.lastNewLines : [],
     drawnNumbers: normalizeDrawnNumbers(raw?.drawnNumbers),
-    bountyNumbers: normalizeBountyNumbers(raw?.bountyNumbers),
+    bountyNumbers: normalizeBountyNumbers(normalizeBounties(raw?.bounties, raw?.bountyNumbers)),
     memoText: String(raw?.memoText || ""),
     lastDrawnNumber: normalizeLastDrawnNumber(raw?.lastDrawnNumber),
     lastDrawMatched: Boolean(raw?.lastDrawMatched),
