@@ -3,10 +3,6 @@
     "bingoRooms": {
       ".read": true,
       ".write": true
-    },
-    "bingoBattle": {
-      ".read": true,
-      ".write": true
     }
   }
 }
