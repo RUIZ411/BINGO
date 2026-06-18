@@ -1383,6 +1383,69 @@ function getNumberDigitClass(value) {
   return "number-digit-3";
 }
 
+
+function render() {
+  if (!activeRoomId) {
+    renderRoomCards();
+    if (els.pageTitle) els.pageTitle.textContent = "빙고 방 선택";
+    return;
+  }
+
+  currentState = normalizeState(currentState);
+  updateRoomAccessState();
+
+  if (els.pageTitle) els.pageTitle.textContent = getViewTitle();
+  if (els.currentRoomName) els.currentRoomName.textContent = currentState.roomName || getRoomLabel(activeRoomId);
+  if (els.currentRoomCode) els.currentRoomCode.textContent = isAdmin ? (currentState.accessCode || "-") : "입장 후 표시";
+  if (els.roomInfoBox) els.roomInfoBox.hidden = false;
+  if (els.boardTitle) els.boardTitle.textContent = currentState.title;
+  if (els.titleInput) els.titleInput.value = currentState.title;
+  if (els.typeSelect) els.typeSelect.value = currentState.contentType;
+  syncSizeSelectForType(currentState.contentType, currentState.size);
+
+  const isResetBingo = currentState.contentType === "reset";
+  const isNumberBingo = currentState.contentType === "number";
+  const isLetterBingo = currentState.contentType === "alphabet" || currentState.contentType === "reset";
+  const resetRewards = normalizeResetRewards(currentState.resetRewards);
+
+  document.body.classList.toggle("is-reset-bingo", isResetBingo);
+  document.body.classList.toggle("is-number-bingo", isNumberBingo);
+  document.body.classList.toggle("is-letter-bingo", isLetterBingo);
+
+  if (els.chickenInput) els.chickenInput.value = String(currentState.chickenCount);
+  if (els.chickenPreview) els.chickenPreview.textContent = currentState.chickenCount;
+  if (els.bingoCount) els.bingoCount.textContent = currentState.bingoCount;
+  if (els.chickenCount) els.chickenCount.textContent = currentState.chickenCount;
+  if (els.resetBingoCount) els.resetBingoCount.textContent = currentState.bingoCount;
+  if (els.resetChickenCount) els.resetChickenCount.textContent = currentState.chickenCount;
+  if (els.resetRewardOne) els.resetRewardOne.value = String(resetRewards.one);
+  if (els.resetRewardLine) els.resetRewardLine.value = String(resetRewards.line);
+  if (els.resetRewardAll) els.resetRewardAll.value = String(resetRewards.all);
+  if (els.resetMenuOne) els.resetMenuOne.textContent = String(resetRewards.one);
+  if (els.resetMenuLine) els.resetMenuLine.textContent = String(resetRewards.line);
+  if (els.resetMenuAll) els.resetMenuAll.textContent = String(resetRewards.all);
+  if (els.standardScoreStrip) els.standardScoreStrip.hidden = isResetBingo;
+  if (els.resetScoreMenu) els.resetScoreMenu.hidden = !isResetBingo;
+  if (els.maxBingoCount) els.maxBingoCount.textContent = currentState.size * 2 + 2;
+  if (els.bingoBoard) els.bingoBoard.style.setProperty("--cell-size", currentState.size);
+
+  renderMemoState();
+  updateAdminPanelSections();
+  renderAdminLock();
+  renderEditModeState();
+  updateBountyPanelState();
+  updateResetMenuAdminState();
+  renderBoard();
+  renderLines();
+  maybePlayBingoEffect();
+}
+
+function getViewTitle() {
+  const roomName = currentState.roomName || getRoomLabel(activeRoomId);
+  if (activeView === "obs") return `${roomName} 송출용`;
+  return roomName;
+}
+
 function renderAdminLock() {
   const locked = activeView !== "obs" && !isAdmin;
   $$('[data-admin-only]').forEach((item) => {
