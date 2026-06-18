@@ -20,6 +20,7 @@
       <nav class="view-tabs" aria-label="화면 전환">
         <a href="?view=public" data-view-link="public">메인 화면</a>
         <a href="?view=obs" data-view-link="obs">송출용</a>
+        <a href="?view=battle" data-view-link="battle">대결 화면</a>
         <button id="memoOpenBtn" class="memo-open-btn" type="button">📝 메모장</button>
       </nav>
     </header>
@@ -31,7 +32,61 @@
         <p>방을 생성하려면 관리자 코드를 입력하고, 생성된 5자리 입장 코드로 방에 접속하세요.</p>
       </div>
       <div id="roomCards" class="room-grid" aria-live="polite"></div>
+      <div class="home-battle-cta">
+        <a class="battle-home-link" href="?view=battle">⚔️ 1:1 대결 화면 열기</a>
+      </div>
       <p class="home-help">방 코드는 접속 권한을 구분하기 위한 간편 코드입니다. 코드가 공유되면 같은 방을 조작할 수 있어요.</p>
+    </section>
+
+
+
+    <section class="battle-screen" id="battleScreen" hidden>
+      <div class="battle-hero">
+        <p class="eyebrow">BATTLE MODE</p>
+        <h2>1:1 대결 화면</h2>
+        <p>생성된 방 두 개를 선택해서 빙고 수와 치킨 수, 빙고판 진행 상황을 한 화면에서 비교합니다.</p>
+      </div>
+
+      <div class="battle-settings-card">
+        <div class="panel-head">
+          <h2>대결 구도 설정</h2>
+          <span class="status-pill warn">관리자 코드 필요</span>
+        </div>
+        <div class="battle-settings-grid">
+          <label>
+            왼쪽 방
+            <select id="battleLeftRoom"></select>
+          </label>
+          <label>
+            왼쪽 표시 이름
+            <input id="battleLeftName" type="text" maxlength="18" placeholder="예: A팀" />
+          </label>
+          <label>
+            오른쪽 방
+            <select id="battleRightRoom"></select>
+          </label>
+          <label>
+            오른쪽 표시 이름
+            <input id="battleRightName" type="text" maxlength="18" placeholder="예: B팀" />
+          </label>
+          <label>
+            관리자 코드
+            <input id="battleAdminCode" type="password" placeholder="관리자 코드" autocomplete="off" />
+          </label>
+        </div>
+        <div class="row-buttons wrap">
+          <button id="battleSaveBtn" class="primary-btn" type="button">대결 구도 저장</button>
+          <button id="battleSwapBtn" class="ghost-btn" type="button">좌우 바꾸기</button>
+          <a class="ghost-link-btn" href="./">방 선택으로</a>
+        </div>
+        <p id="battleSaveStatus" class="help-text">저장하면 아래 대결 화면과 다른 접속자 화면에 실시간 반영됩니다.</p>
+      </div>
+
+      <div class="battle-arena" id="battleArena">
+        <article class="battle-side battle-left" id="battleLeftSide"></article>
+        <div class="battle-versus">VS</div>
+        <article class="battle-side battle-right" id="battleRightSide"></article>
+      </div>
     </section>
 
     <div class="admin-toggle-row" id="adminToggleRow" hidden>
@@ -74,7 +129,7 @@
           <div id="localLoginBox" class="login-box" hidden>
             <label>
               로컬 관리자 PIN
-              <input id="localPin" type="password" placeholder="기본값 0305" />
+              <input id="localPin" type="password" placeholder="기본값 1234" />
             </label>
             <div class="row-buttons">
               <button id="localLoginBtn" class="primary-btn">관리자 열기</button>

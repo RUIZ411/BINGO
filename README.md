@@ -1,43 +1,63 @@
-# SUWEET BINGO - Room Version
+# SUWEET BINGO V1 - 1:1 대결 화면 버전
 
-## 추가된 방 구조
+## 적용된 주요 기능
 
-- 홈페이지에서 4개 방을 선택합니다.
+- 방 4개 구조 유지
   - 1번 방
   - 2번 방
   - 3번 방
   - 수힛방
-- 방 생성 시 관리자 코드가 필요합니다.
-- 방 생성 후 5자리 랜덤 입장 코드가 발급됩니다.
-- 이후 접속자는 해당 5자리 코드로 방에 입장해 빙고판을 조작할 수 있습니다.
-- 각 방의 빙고판, 체크 상태, 치킨 수, 현상금, 메모장, 추첨 기록은 서로 독립 저장됩니다.
+- 기본 방 생성 관리자 코드: `0305`
+- 방 생성 시 5자리 랜덤 입장 코드 발급
+- 각 방별 빙고판/치킨/현상금/메모/추첨 기록 독립 저장
+- 1:1 대결 화면 추가
+- 대결 화면에서 왼쪽 방 / 오른쪽 방 선택 가능
+- 대결 화면에 표시될 양쪽 이름 직접 수정 가능
+- 대결 구도 저장 시 관리자 코드 `0305` 필요
+- 대결 화면에서 각 방의 빙고판, 빙고 수, 치킨 수를 실시간 비교 표시
+- 기존 기능 유지
+  - 현상금 모든 빙고 타입 지원
+  - 현상금 개수 표시
+  - 칸 수정 모드
+  - 메모장 팝업
+  - 숫자/알파벳/리셋 글자 확대
+  - 송출용 화면/비율 조절
 
-## 관리자 코드 변경
+## 주소
 
-`app.js` 상단에서 아래 값을 바꾸면 됩니다.
-
-```js
-const MASTER_ROOM_ADMIN_CODE = "0305";
-```
-
-## 화면 주소
-
-홈페이지:
+방 선택 화면:
 
 ```txt
 index.html
 ```
 
-방 접속 후에는 자동으로 아래 구조를 사용합니다.
+각 방 메인 화면:
 
 ```txt
 index.html?room=room1&view=public
-index.html?room=room1&view=obs
+index.html?room=room2&view=public
+index.html?room=room3&view=public
+index.html?room=special&view=public
 ```
 
-## Firebase Rules 중요
+각 방 송출용:
 
-방 코드 방식은 GitHub Pages 정적 사이트에서 동작하는 간편 권한 구조입니다. 방 코드로 접속한 사용자가 Firebase에 저장할 수 있어야 하므로 Realtime Database Rules는 아래처럼 설정해야 합니다.
+```txt
+index.html?room=room1&view=obs
+index.html?room=room2&view=obs
+index.html?room=room3&view=obs
+index.html?room=special&view=obs
+```
+
+1:1 대결 화면:
+
+```txt
+index.html?view=battle
+```
+
+## Firebase Rules
+
+Firebase Console > Realtime Database > Rules에 아래처럼 적용하세요.
 
 ```json
 {
@@ -45,22 +65,25 @@ index.html?room=room1&view=obs
     "bingoRooms": {
       ".read": true,
       ".write": true
+    },
+    "bingoBattle": {
+      ".read": true,
+      ".write": true
     }
   }
 }
 ```
 
-이 방식은 방송/지인 운영용 간편 코드 방식입니다. 방 코드가 공유되면 같은 방을 조작할 수 있습니다.
+## GitHub 적용
 
-## 포함 기능
+압축을 푼 뒤 아래 파일들을 기존 위치에 덮어씌우세요.
 
-- 숫자 / 미션 / 알파벳 / 리셋 빙고
-- 숫자 빙고 5×5 / 7×7 / 10×10
-- 미션 / 알파벳 / 리셋 5×5 고정
-- 숫자 랜덤 추첨
-- 현상금 대상 칸 + 현상금 개수 표시
-- 칸 수정 모드
-- 메모장 팝업
-- 리셋 빙고 메뉴판
-- 송출용 화면 + 비율 조절
-- 방별 독립 저장
+```txt
+index.html
+style.css
+app.js
+firebase.rules.json
+README.md
+```
+
+업로드 후 브라우저에서 `Ctrl + F5`로 강력 새로고침하세요.

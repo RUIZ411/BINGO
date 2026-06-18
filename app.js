@@ -33,6 +33,8 @@ const firebaseConfig = {
 };
 
 const ROOMS_PATH = "bingoRooms";
+const BATTLE_PATH = "bingoBattle/current";
+const BATTLE_STORAGE_KEY = "suweet-bingo-battle-config";
 const ROOM_OPTIONS = [
   { id: "room1", label: "1번 방" },
   { id: "room2", label: "2번 방" },
@@ -50,6 +52,14 @@ const ADMIN_EMAIL_DOMAIN = "@suweet.com";
 const BINGO_TYPES = ["mission", "number", "alphabet", "reset"];
 const NUMBER_BINGO_SIZES = [5, 7, 10];
 
+
+const battleDefaults = {
+  leftRoomId: "room1",
+  rightRoomId: "room2",
+  leftName: "1번 방",
+  rightName: "2번 방",
+  updatedAt: 0
+};
 
 const stateDefaults = {
   roomId: "",
@@ -85,6 +95,17 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 const els = {
   homeScreen: $("#homeScreen"),
   roomCards: $("#roomCards"),
+  battleScreen: $("#battleScreen"),
+  battleLeftRoom: $("#battleLeftRoom"),
+  battleRightRoom: $("#battleRightRoom"),
+  battleLeftName: $("#battleLeftName"),
+  battleRightName: $("#battleRightName"),
+  battleAdminCode: $("#battleAdminCode"),
+  battleSaveBtn: $("#battleSaveBtn"),
+  battleSwapBtn: $("#battleSwapBtn"),
+  battleSaveStatus: $("#battleSaveStatus"),
+  battleLeftSide: $("#battleLeftSide"),
+  battleRightSide: $("#battleRightSide"),
   roomGateModal: $("#roomGateModal"),
   roomGateInput: $("#roomGateInput"),
   roomGateEnterBtn: $("#roomGateEnterBtn"),
@@ -191,6 +212,7 @@ let db = null;
 let auth = null;
 let roomsRef = null;
 let roomRef = null;
+let battleRef = null;
 let isFirebaseEnabled = Boolean(firebaseConfig.apiKey && firebaseConfig.databaseURL && firebaseConfig.projectId);
 let isAdmin = false;
 let activeView = urlParams.get("view") || "public";
@@ -200,9 +222,10 @@ let cellSaveTimers = new Map();
 let obsScale = getInitialObsScale();
 let isEditMode = false;
 let editingCellIndex = null;
+let battleConfig = structuredClone(battleDefaults);
 
-if (!["public", "obs"].includes(activeView)) activeView = "public";
-if (!activeRoomId) activeView = "public";
+if (!["public", "obs", "battle"].includes(activeView)) activeView = "public";
+if (!activeRoomId && activeView !== "battle") activeView = "public";
 
 init();
 
@@ -215,32 +238,39 @@ async function init() {
 }
 
 function setupView() {
-  const isHome = !activeRoomId;
+  const isBattle = activeView === "battle";
+  const isHome = !activeRoomId && !isBattle;
+
   document.body.classList.toggle("view-home", isHome);
+  document.body.classList.toggle("view-battle", isBattle);
   document.body.classList.add(`view-${activeView}`);
 
   if (els.homeScreen) els.homeScreen.hidden = !isHome;
+  if (els.battleScreen) els.battleScreen.hidden = !isBattle;
   const layout = document.querySelector(".layout");
-  if (layout) layout.hidden = isHome;
+  if (layout) layout.hidden = isHome || isBattle;
 
   $$('[data-view-link]').forEach((link) => {
     const viewName = link.dataset.viewLink;
-    link.classList.toggle("active", !isHome && viewName === activeView);
-    if (!isHome && activeRoomId) {
+    link.classList.toggle("active", viewName === activeView);
+
+    if (viewName === "battle") {
+      link.href = "?view=battle";
+    } else if (!isHome && !isBattle && activeRoomId) {
       link.href = `?room=${encodeURIComponent(activeRoomId)}&view=${encodeURIComponent(viewName)}`;
     } else {
       link.href = "#";
     }
   });
 
-  if (els.memoOpenBtn) els.memoOpenBtn.hidden = isHome || activeView === "obs";
+  if (els.memoOpenBtn) els.memoOpenBtn.hidden = isHome || isBattle || activeView === "obs";
 
-  if (isHome) {
+  if (isHome || isBattle) {
     if (els.adminPanel) els.adminPanel.hidden = true;
     if (els.adminToggleRow) els.adminToggleRow.hidden = true;
     if (els.cellEditorHelp) els.cellEditorHelp.hidden = true;
     if (els.obsScalePanel) els.obsScalePanel.hidden = true;
-    if (els.pageTitle) els.pageTitle.textContent = "빙고 방 선택";
+    if (els.pageTitle) els.pageTitle.textContent = isBattle ? "1:1 대결 화면" : "빙고 방 선택";
     return;
   }
 
@@ -268,6 +298,7 @@ function setupFirebaseIfAvailable() {
   db = getDatabase(firebaseApp);
   auth = getAuth(firebaseApp);
   roomsRef = ref(db, ROOMS_PATH);
+  battleRef = ref(db, BATTLE_PATH);
   if (activeRoomId) roomRef = ref(db, `${ROOMS_PATH}/${activeRoomId}`);
 
   if (els.firebaseLoginBox) els.firebaseLoginBox.hidden = true;
@@ -277,6 +308,12 @@ function setupFirebaseIfAvailable() {
   onValue(roomsRef, (snapshot) => {
     roomSummaries = snapshot.exists() ? snapshot.val() : {};
     renderRoomCards();
+    if (activeView === "battle") renderBattleView();
+  });
+
+  onValue(battleRef, (snapshot) => {
+    battleConfig = normalizeBattleConfig(snapshot.exists() ? snapshot.val() : null);
+    renderBattleView();
   });
 
   if (!activeRoomId || !roomRef) return;
@@ -300,7 +337,12 @@ function setupFirebaseIfAvailable() {
 async function loadInitialState() {
   if (!activeRoomId) {
     currentState = makeInitialState();
+    if (!isFirebaseEnabled) {
+      roomSummaries = loadLocalRoomSummaries();
+      battleConfig = loadLocalBattleConfig();
+    }
     renderRoomCards();
+    if (activeView === "battle") renderBattleView();
     return;
   }
 
@@ -552,6 +594,23 @@ function bindEvents() {
   els.leaveRoomBtn?.addEventListener("click", () => {
     clearRoomCode(activeRoomId);
     location.href = "./";
+  });
+
+
+  els.battleSaveBtn?.addEventListener("click", saveBattleConfigFromForm);
+  els.battleSwapBtn?.addEventListener("click", () => {
+    const leftRoom = els.battleLeftRoom?.value || battleConfig.leftRoomId;
+    const rightRoom = els.battleRightRoom?.value || battleConfig.rightRoomId;
+    const leftName = els.battleLeftName?.value || "";
+    const rightName = els.battleRightName?.value || "";
+    if (els.battleLeftRoom) els.battleLeftRoom.value = rightRoom;
+    if (els.battleRightRoom) els.battleRightRoom.value = leftRoom;
+    if (els.battleLeftName) els.battleLeftName.value = rightName;
+    if (els.battleRightName) els.battleRightName.value = leftName;
+  });
+
+  [els.battleLeftRoom, els.battleRightRoom].forEach((select) => {
+    select?.addEventListener("change", syncBattleNameInputsFromRooms);
   });
 
   els.adminToggle?.addEventListener("click", () => {
@@ -813,6 +872,199 @@ function bindEvents() {
       Object.assign(draft, fresh);
     });
   });
+}
+
+
+function loadLocalRoomSummaries() {
+  return Object.fromEntries(ROOM_IDS.map((roomId) => {
+    const saved = localStorage.getItem(getLocalStorageKey(roomId));
+    return [roomId, saved ? normalizeState(JSON.parse(saved)) : null];
+  }).filter(([, value]) => Boolean(value?.accessCode)));
+}
+
+function loadLocalBattleConfig() {
+  try {
+    return normalizeBattleConfig(JSON.parse(localStorage.getItem(BATTLE_STORAGE_KEY) || "null"));
+  } catch {
+    return normalizeBattleConfig(null);
+  }
+}
+
+function normalizeBattleConfig(raw) {
+  const leftRoomId = normalizeRoomId(raw?.leftRoomId) || "room1";
+  let rightRoomId = normalizeRoomId(raw?.rightRoomId) || "room2";
+  if (rightRoomId === leftRoomId) rightRoomId = ROOM_IDS.find((id) => id !== leftRoomId) || "room2";
+
+  return {
+    ...battleDefaults,
+    ...raw,
+    leftRoomId,
+    rightRoomId,
+    leftName: String(raw?.leftName || getRoomDisplayName(leftRoomId)),
+    rightName: String(raw?.rightName || getRoomDisplayName(rightRoomId)),
+    updatedAt: Number(raw?.updatedAt || 0)
+  };
+}
+
+function getRoomStateForBattle(roomId) {
+  const data = roomSummaries?.[roomId];
+  if (!data?.accessCode) return null;
+  return normalizeState({ ...data, roomId, roomName: data.roomName || getRoomLabel(roomId) });
+}
+
+function getRoomDisplayName(roomId) {
+  const data = roomSummaries?.[roomId];
+  return String(data?.roomName || getRoomLabel(roomId));
+}
+
+function syncBattleSelectOptions() {
+  [els.battleLeftRoom, els.battleRightRoom].forEach((select) => {
+    if (!select) return;
+    const previous = select.value;
+    select.innerHTML = ROOM_OPTIONS.map((room) => {
+      const exists = Boolean(roomSummaries?.[room.id]?.accessCode);
+      const label = `${room.label}${exists ? "" : " · 미생성"}`;
+      return `<option value="${room.id}">${escapeHtml(label)}</option>`;
+    }).join("");
+    select.value = ROOM_IDS.includes(previous) ? previous : (select === els.battleLeftRoom ? battleConfig.leftRoomId : battleConfig.rightRoomId);
+  });
+}
+
+function syncBattleNameInputsFromRooms() {
+  const leftId = normalizeRoomId(els.battleLeftRoom?.value) || battleConfig.leftRoomId;
+  const rightId = normalizeRoomId(els.battleRightRoom?.value) || battleConfig.rightRoomId;
+  if (els.battleLeftName && !els.battleLeftName.value.trim()) els.battleLeftName.value = getRoomDisplayName(leftId);
+  if (els.battleRightName && !els.battleRightName.value.trim()) els.battleRightName.value = getRoomDisplayName(rightId);
+}
+
+async function saveBattleConfigFromForm() {
+  const adminCode = String(els.battleAdminCode?.value || "").trim();
+  if (adminCode !== MASTER_ROOM_ADMIN_CODE) {
+    alert("관리자 코드가 맞지 않습니다.");
+    return;
+  }
+
+  const leftRoomId = normalizeRoomId(els.battleLeftRoom?.value);
+  const rightRoomId = normalizeRoomId(els.battleRightRoom?.value);
+  if (!leftRoomId || !rightRoomId) {
+    alert("대결할 방을 선택해 주세요.");
+    return;
+  }
+  if (leftRoomId === rightRoomId) {
+    alert("서로 다른 두 방을 선택해 주세요.");
+    return;
+  }
+
+  const nextConfig = normalizeBattleConfig({
+    leftRoomId,
+    rightRoomId,
+    leftName: els.battleLeftName?.value.trim() || getRoomDisplayName(leftRoomId),
+    rightName: els.battleRightName?.value.trim() || getRoomDisplayName(rightRoomId),
+    updatedAt: Date.now()
+  });
+
+  battleConfig = nextConfig;
+  renderBattleView();
+
+  try {
+    if (isFirebaseEnabled && db) {
+      await set(ref(db, BATTLE_PATH), nextConfig);
+    } else {
+      localStorage.setItem(BATTLE_STORAGE_KEY, JSON.stringify(nextConfig));
+    }
+    if (els.battleAdminCode) els.battleAdminCode.value = "";
+    if (els.battleSaveStatus) els.battleSaveStatus.textContent = "대결 구도가 저장됐어요.";
+  } catch (error) {
+    console.error("대결 구도 저장 실패", error);
+    alert("대결 구도 저장에 실패했습니다. Firebase Rules 권한을 확인해 주세요.");
+  }
+}
+
+function renderBattleView() {
+  if (activeView !== "battle" || !els.battleScreen) return;
+
+  battleConfig = normalizeBattleConfig(battleConfig);
+  syncBattleSelectOptions();
+
+  if (els.battleLeftRoom) els.battleLeftRoom.value = battleConfig.leftRoomId;
+  if (els.battleRightRoom) els.battleRightRoom.value = battleConfig.rightRoomId;
+  if (els.battleLeftName && document.activeElement !== els.battleLeftName) els.battleLeftName.value = battleConfig.leftName || getRoomDisplayName(battleConfig.leftRoomId);
+  if (els.battleRightName && document.activeElement !== els.battleRightName) els.battleRightName.value = battleConfig.rightName || getRoomDisplayName(battleConfig.rightRoomId);
+
+  const leftState = getRoomStateForBattle(battleConfig.leftRoomId);
+  const rightState = getRoomStateForBattle(battleConfig.rightRoomId);
+  renderBattleSide(els.battleLeftSide, leftState, battleConfig.leftName || getRoomDisplayName(battleConfig.leftRoomId), "left");
+  renderBattleSide(els.battleRightSide, rightState, battleConfig.rightName || getRoomDisplayName(battleConfig.rightRoomId), "right");
+}
+
+function renderBattleSide(container, state, displayName, side) {
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (!state) {
+    container.innerHTML = `
+      <div class="battle-empty">
+        <p class="eyebrow">${side === "left" ? "LEFT" : "RIGHT"}</p>
+        <h3>${escapeHtml(displayName || "미생성 방")}</h3>
+        <p>아직 생성되지 않은 방입니다.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const size = Number(state.size || 5);
+  const cellPx = size >= 10 ? 38 : size >= 7 ? 48 : 62;
+  const completedCellIndexes = new Set(Object.values(state.completedLines || {}).flatMap((line) => line.cells || []));
+  const bounties = normalizeBounties(state.bounties, state.bountyNumbers);
+
+  const head = document.createElement("div");
+  head.className = "battle-side-head";
+  head.innerHTML = `
+    <p class="eyebrow">${side === "left" ? "LEFT TEAM" : "RIGHT TEAM"}</p>
+    <h3>${escapeHtml(displayName || state.roomName || "빙고 방")}</h3>
+    <p>${escapeHtml(state.title || "오늘의 빙고")} · ${getContentTypeLabel(state.contentType)} ${size}×${size}</p>
+  `;
+
+  const score = document.createElement("div");
+  score.className = "battle-score-row";
+  score.innerHTML = `
+    <div class="battle-score-box"><span>BINGO</span><strong>${Number(state.bingoCount || 0)}</strong></div>
+    <div class="battle-score-box chicken"><span>🍗</span><strong>${Number(state.chickenCount || 0)}</strong></div>
+  `;
+
+  const board = document.createElement("div");
+  board.className = `battle-board ${state.contentType === "number" ? "is-number-battle" : ""} ${(state.contentType === "alphabet" || state.contentType === "reset") ? "is-letter-battle" : ""}`.trim();
+  board.style.setProperty("--cell-size", String(size));
+  board.style.setProperty("--battle-cell-px", `${cellPx}px`);
+
+  state.cells.forEach((cell, index) => {
+    const cellEl = document.createElement("div");
+    const numberDigitClass = state.contentType === "number" ? getNumberDigitClass(cell.text) : "";
+    cellEl.className = `battle-cell ${getTextLengthClass(cell.text)} ${numberDigitClass}`.trim();
+    cellEl.classList.toggle("cleared", Boolean(cell.cleared));
+    cellEl.classList.toggle("line-completed", completedCellIndexes.has(index));
+
+    const bountyTarget = normalizeBountyTarget(cell.text);
+    const bountyAmount = bountyTarget ? bounties[bountyTarget] : null;
+    const hasBounty = Number.isFinite(Number(bountyAmount)) && Number(bountyAmount) > 0;
+    cellEl.classList.toggle("bounty", hasBounty);
+
+    const text = document.createElement("div");
+    text.className = "cell-text";
+    text.textContent = cell.text;
+    cellEl.append(text);
+
+    if (hasBounty) {
+      const amount = document.createElement("div");
+      amount.className = `bounty-amount ${getBountyAmountClass(bountyAmount)}`;
+      amount.textContent = formatBountyAmount(bountyAmount);
+      cellEl.append(amount);
+    }
+
+    board.append(cellEl);
+  });
+
+  container.append(head, score, board);
 }
 
 function getAllowedSizesForType(contentType) {
@@ -1331,6 +1583,12 @@ function normalizeLastDrawnNumber(value) {
 }
 
 function render() {
+  if (activeView === "battle") {
+    renderBattleView();
+    if (els.pageTitle) els.pageTitle.textContent = "1:1 대결 화면";
+    return;
+  }
+
   if (!activeRoomId) {
     renderRoomCards();
     if (els.pageTitle) els.pageTitle.textContent = "빙고 방 선택";
