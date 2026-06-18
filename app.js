@@ -66,12 +66,6 @@ const stateDefaults = {
     line: 0,
     all: 0
   },
-  apiConfig: {
-    enabled: false,
-    streamerIds: []
-  },
-  apiLogs: [],
-  processedEvents: {},
   bountyNumbers: [],
   bounties: {},
   memoText: "",
@@ -153,15 +147,6 @@ const els = {
   resetRewardOne: $("#resetRewardOne"),
   resetRewardLine: $("#resetRewardLine"),
   resetRewardAll: $("#resetRewardAll"),
-  apiPanel: $("#apiPanel"),
-  apiEnabledInput: $("#apiEnabledInput"),
-  apiStreamerIdsInput: $("#apiStreamerIdsInput"),
-  apiSaveBtn: $("#apiSaveBtn"),
-  apiTestStreamerInput: $("#apiTestStreamerInput"),
-  apiTestAmountInput: $("#apiTestAmountInput"),
-  apiTestBtn: $("#apiTestBtn"),
-  apiLogPreview: $("#apiLogPreview"),
-  apiLogList: $("#apiLogList"),
   standardScoreStrip: $("#standardScoreStrip"),
   resetScoreMenu: $("#resetScoreMenu"),
   resetBingoCount: $("#resetBingoCount"),
@@ -899,17 +884,6 @@ function bindEvents() {
     });
   });
 
-  els.apiSaveBtn?.addEventListener("click", saveApiConfig);
-  els.apiTestBtn?.addEventListener("click", runApiTestEvent);
-  [els.apiTestStreamerInput, els.apiTestAmountInput].forEach((input) => {
-    input?.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        runApiTestEvent();
-      }
-    });
-  });
-
   els.applyBulkBtn.addEventListener("click", () => {
     const lines = els.bulkText.value
       .split("\n")
@@ -1141,342 +1115,6 @@ function normalizeResetRewards(value) {
     line: Math.max(0, Number(value?.line || 0)),
     all: Math.max(0, Number(value?.all || 0))
   };
-}
-
-function normalizeStreamerId(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function normalizeStreamerIds(value) {
-  const source = Array.isArray(value) ? value.join("\n") : String(value || "");
-  return Array.from(new Set(source
-    .split(/[\n,]+/g)
-    .map((item) => normalizeStreamerId(item))
-    .filter(Boolean)));
-}
-
-function normalizeApiConfig(value) {
-  return {
-    enabled: Boolean(value?.enabled),
-    streamerIds: normalizeStreamerIds(value?.streamerIds)
-  };
-}
-
-function normalizeApiLogs(value) {
-  const source = Array.isArray(value)
-    ? value
-    : (value && typeof value === "object" ? Object.values(value) : []);
-
-  return source
-    .filter(Boolean)
-    .map((log) => ({
-      id: String(log.id || `log_${log.createdAt || Date.now()}_${Math.random().toString(36).slice(2, 7)}`),
-      eventId: String(log.eventId || ""),
-      source: String(log.source || "test"),
-      streamerId: String(log.streamerId || "-"),
-      amount: Math.max(0, Number(log.amount || 0)),
-      action: String(log.action || "none"),
-      result: String(log.result || ""),
-      affectedCells: Array.isArray(log.affectedCells) ? log.affectedCells.map(Number).filter(Number.isInteger) : [],
-      createdAt: Number(log.createdAt || Date.now())
-    }))
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 30);
-}
-
-function normalizeProcessedEvents(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  const entries = Object.entries(value)
-    .map(([eventId, createdAt]) => [
-      String(eventId || "").trim(),
-      Number(createdAt || Date.now())
-    ])
-    .filter(([eventId]) => eventId)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 200);
-
-  return Object.fromEntries(entries);
-}
-
-function hasProcessedEvent(draft, eventId) {
-  const events = normalizeProcessedEvents(draft.processedEvents);
-  return Boolean(eventId && events[eventId]);
-}
-
-function markProcessedEvent(draft, eventId) {
-  if (!eventId) return;
-
-  const events = normalizeProcessedEvents(draft.processedEvents);
-  events[eventId] = Date.now();
-
-  const limited = Object.entries(events)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 200);
-
-  draft.processedEvents = Object.fromEntries(limited);
-}
-
-function pushApiLog(draft, log) {
-  const logs = normalizeApiLogs(draft.apiLogs);
-  logs.unshift({
-    id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    eventId: String(log.eventId || ""),
-    source: log.source || "test",
-    streamerId: log.streamerId || "-",
-    amount: Math.max(0, Number(log.amount || 0)),
-    action: log.action || "none",
-    result: log.result || "",
-    affectedCells: Array.isArray(log.affectedCells) ? log.affectedCells : [],
-    createdAt: Date.now()
-  });
-  draft.apiLogs = normalizeApiLogs(logs);
-}
-
-function saveApiConfig() {
-  if (!isAdmin) {
-    alert("방 입장 후 저장할 수 있습니다.");
-    return;
-  }
-
-  const streamerIds = normalizeStreamerIds(els.apiStreamerIdsInput?.value || "");
-  commitState((draft) => {
-    draft.apiConfig = {
-      enabled: Boolean(els.apiEnabledInput?.checked),
-      streamerIds
-    };
-  });
-}
-
-function createManualTestFundingEvent({ streamerId, amount }) {
-  return {
-    eventId: `manual_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-    source: "manual-test",
-    eventType: "battleMissionFunding",
-    streamerId: normalizeStreamerId(streamerId),
-    amount: Number(amount || 0),
-    createdAt: Date.now()
-  };
-}
-
-function normalizeFundingEvent(event) {
-  const eventId = String(event?.eventId || "").trim()
-    || `${event?.source || "unknown"}_${event?.streamerId || "noid"}_${event?.amount || 0}_${event?.createdAt || Date.now()}`;
-
-  return {
-    eventId,
-    source: String(event?.source || "unknown"),
-    eventType: String(event?.eventType || "battleMissionFunding"),
-    streamerId: normalizeStreamerId(event?.streamerId),
-    amount: Number(event?.amount || 0),
-    createdAt: Number(event?.createdAt || Date.now())
-  };
-}
-
-function runApiTestEvent() {
-  if (!isAdmin) {
-    alert("방 입장 후 테스트할 수 있습니다.");
-    return;
-  }
-
-  const streamerId = normalizeStreamerId(els.apiTestStreamerInput?.value || "");
-  const amount = Number(els.apiTestAmountInput?.value || 0);
-
-  if (!streamerId) {
-    alert("테스트 스트리머 아이디를 입력해 주세요.");
-    els.apiTestStreamerInput?.focus();
-    return;
-  }
-
-  if (!Number.isInteger(amount) || amount <= 0) {
-    alert("테스트 펀딩 개수는 1 이상의 정수로 입력해 주세요.");
-    els.apiTestAmountInput?.focus();
-    return;
-  }
-
-  const event = createManualTestFundingEvent({
-    streamerId,
-    amount
-  });
-
-  commitState((draft) => {
-    handleFundingEventToDraft(draft, event);
-  });
-}
-
-function handleFundingEventToDraft(draft, rawEvent) {
-  const event = normalizeFundingEvent(rawEvent);
-  const config = normalizeApiConfig(draft.apiConfig);
-  const rewards = normalizeResetRewards(draft.resetRewards);
-
-  let action = "none";
-  let affectedCells = [];
-  let result = "기준값과 일치하지 않아 실행하지 않음";
-
-  if (hasProcessedEvent(draft, event.eventId)) {
-    pushApiLog(draft, {
-      eventId: event.eventId,
-      source: event.source,
-      streamerId: event.streamerId,
-      amount: event.amount,
-      action: "duplicate",
-      result: "이미 처리한 이벤트라 중복 실행하지 않음",
-      affectedCells: []
-    });
-
-    return {
-      action: "duplicate",
-      affectedCells: [],
-      result: "이미 처리한 이벤트"
-    };
-  }
-
-  if (!config.enabled) {
-    result = "연동 OFF 상태라 실행하지 않음";
-  } else if (!event.streamerId) {
-    result = "스트리머 아이디가 없어 실행하지 않음";
-  } else if (!config.streamerIds.includes(event.streamerId)) {
-    result = "등록되지 않은 스트리머 아이디라 실행하지 않음";
-  } else if (!Number.isInteger(event.amount) || event.amount <= 0) {
-    result = "펀딩 개수가 올바르지 않아 실행하지 않음";
-  } else if (rewards.all > 0 && event.amount === rewards.all) {
-    action = "all";
-    affectedCells = uncheckAllCells(draft);
-    result = affectedCells.length
-      ? `전체 ${affectedCells.length}칸 체크 해제`
-      : "체크된 칸이 없어 실행할 내용 없음";
-  } else if (rewards.line > 0 && event.amount === rewards.line) {
-    action = "line";
-    affectedCells = uncheckRandomCheckedLine(draft);
-    result = affectedCells.length
-      ? `랜덤 한줄 ${affectedCells.length}칸 체크 해제`
-      : "체크된 칸이 포함된 줄이 없어 실행할 내용 없음";
-  } else if (rewards.one > 0 && event.amount === rewards.one) {
-    action = "single";
-    affectedCells = uncheckRandomCheckedCell(draft);
-    result = affectedCells.length
-      ? "랜덤 한칸 체크 해제"
-      : "체크된 칸이 없어 실행할 내용 없음";
-  }
-
-  markProcessedEvent(draft, event.eventId);
-
-  pushApiLog(draft, {
-    eventId: event.eventId,
-    source: event.source,
-    streamerId: event.streamerId,
-    amount: event.amount,
-    action,
-    result,
-    affectedCells
-  });
-
-  return {
-    action,
-    affectedCells,
-    result
-  };
-}
-
-function getLineIndexGroups(size) {
-  const groups = [];
-
-  for (let row = 0; row < size; row += 1) {
-    groups.push(Array.from({ length: size }, (_, col) => row * size + col));
-  }
-
-  for (let col = 0; col < size; col += 1) {
-    groups.push(Array.from({ length: size }, (_, row) => row * size + col));
-  }
-
-  groups.push(Array.from({ length: size }, (_, index) => index * size + index));
-  groups.push(Array.from({ length: size }, (_, index) => index * size + (size - 1 - index)));
-  return groups;
-}
-
-function uncheckRandomCheckedCell(draft) {
-  const candidates = draft.cells
-    .map((cell, index) => Boolean(cell?.cleared) ? index : -1)
-    .filter((index) => index >= 0);
-
-  if (!candidates.length) return [];
-  const picked = candidates[Math.floor(Math.random() * candidates.length)];
-  draft.cells[picked].cleared = false;
-  return [picked];
-}
-
-function uncheckRandomCheckedLine(draft) {
-  const groups = getLineIndexGroups(draft.size)
-    .map((cells) => cells.filter((index) => Boolean(draft.cells[index]?.cleared)))
-    .filter((cells) => cells.length > 0);
-
-  if (!groups.length) return [];
-  const pickedGroup = groups[Math.floor(Math.random() * groups.length)];
-  pickedGroup.forEach((index) => {
-    if (draft.cells[index]) draft.cells[index].cleared = false;
-  });
-  return pickedGroup;
-}
-
-function uncheckAllCells(draft) {
-  const affected = [];
-  draft.cells.forEach((cell, index) => {
-    if (cell?.cleared) {
-      cell.cleared = false;
-      affected.push(index);
-    }
-  });
-  return affected;
-}
-
-function renderApiPanelState() {
-  const config = normalizeApiConfig(currentState.apiConfig);
-  const logs = normalizeApiLogs(currentState.apiLogs);
-
-  if (els.apiEnabledInput) els.apiEnabledInput.checked = config.enabled;
-
-  if (els.apiStreamerIdsInput && document.activeElement !== els.apiStreamerIdsInput) {
-    els.apiStreamerIdsInput.value = config.streamerIds.join("\n");
-  }
-
-  if (els.apiTestStreamerInput && document.activeElement !== els.apiTestStreamerInput && !els.apiTestStreamerInput.value.trim()) {
-    els.apiTestStreamerInput.value = config.streamerIds[0] || "";
-  }
-
-  if (els.apiLogPreview) els.apiLogPreview.textContent = String(logs.length);
-
-  if (els.apiLogList) {
-    els.apiLogList.innerHTML = "";
-    if (!logs.length) {
-      const empty = document.createElement("p");
-      empty.className = "api-log-empty";
-      empty.textContent = "아직 테스트/API 로그가 없습니다.";
-      els.apiLogList.append(empty);
-    } else {
-      logs.slice(0, 8).forEach((log) => {
-        const item = document.createElement("div");
-        item.className = `api-log-item action-${log.action}`;
-        const time = new Date(log.createdAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-        item.innerHTML = `
-          <div><strong>${escapeHtml(log.streamerId)}</strong> · <b>${formatBountyAmount(log.amount)}</b>개 · ${escapeHtml(getApiActionLabel(log.action))}</div>
-          <p>${escapeHtml(log.result)} <span>${escapeHtml(time)}</span></p>
-        `;
-        els.apiLogList.append(item);
-      });
-    }
-  }
-}
-
-function getApiActionLabel(action) {
-  return ({
-    single: "한개",
-    line: "한줄",
-    all: "전체",
-    none: "무시",
-    duplicate: "중복"
-  })[action] || "무시";
 }
 
 function updateResetMenuAdminState() {
@@ -1846,7 +1484,6 @@ function render() {
   updateNumberDrawControls();
   updateBountyPanelState();
   updateResetMenuAdminState();
-  renderApiPanelState();
   renderBoard();
   renderLines();
   maybePlayBingoEffect();
@@ -1899,12 +1536,6 @@ function renderAdminLock() {
     els.resetRewardOne,
     els.resetRewardLine,
     els.resetRewardAll,
-    els.apiEnabledInput,
-    els.apiStreamerIdsInput,
-    els.apiSaveBtn,
-    els.apiTestStreamerInput,
-    els.apiTestAmountInput,
-    els.apiTestBtn,
     els.bulkText,
     els.applyBulkBtn,
     els.clearBulkBtn,
@@ -2069,9 +1700,6 @@ function prepareStateForStorage(state) {
     roomName: state.roomName || getRoomLabel(activeRoomId),
     accessCode: state.accessCode || currentState.accessCode || "",
     updatedAt: Date.now(),
-    apiConfig: normalizeApiConfig(state.apiConfig),
-    apiLogs: normalizeApiLogs(state.apiLogs),
-    processedEvents: normalizeProcessedEvents(state.processedEvents),
     bounties: encodeBountiesForStorage(state.bounties),
     bountyNumbers: Object.keys(normalizeBounties(state.bounties))
   };
@@ -2110,9 +1738,6 @@ function normalizeState(raw) {
     contentType,
     chickenCount: Math.max(0, Number(raw?.chickenCount || 0)),
     resetRewards: normalizeResetRewards(raw?.resetRewards),
-    apiConfig: normalizeApiConfig(raw?.apiConfig),
-    apiLogs: normalizeApiLogs(raw?.apiLogs),
-    processedEvents: normalizeProcessedEvents(raw?.processedEvents),
     bounties: normalizeBounties(raw?.bounties, raw?.bountyNumbers),
     effectNonce: Number(raw?.effectNonce || 0),
     lastNewLines: Array.isArray(raw?.lastNewLines) ? raw.lastNewLines : [],

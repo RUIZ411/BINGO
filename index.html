@@ -239,46 +239,7 @@
               <input id="resetRewardAll" type="number" min="0" step="1" value="0" />
             </label>
           </div>
-          <p class="help-text">리셋 빙고일 때 송출 화면 아래 메뉴판에 표시되는 개수를 설정합니다. API 테스트도 이 숫자를 기준으로 정확히 일치할 때만 실행됩니다.</p>
-        </section>
-
-        <section class="panel-card admin-only api-panel" id="apiPanel" data-admin-only>
-          <div class="panel-head">
-            <h2>SOOP 대결미션 테스트</h2>
-            <span class="draw-preview">LOG <b id="apiLogPreview">0</b></span>
-          </div>
-
-          <label class="check-label">
-            <input id="apiEnabledInput" type="checkbox" />
-            연동 사용
-          </label>
-
-          <label>
-            스트리머 아이디
-            <textarea id="apiStreamerIdsInput" class="api-streamer-text" placeholder="한 줄에 하나씩 입력"></textarea>
-          </label>
-
-          <div class="row-buttons wrap">
-            <button id="apiSaveBtn" class="primary-btn" type="button">연동 설정 저장</button>
-          </div>
-
-          <div class="api-test-box">
-            <p class="api-test-title">2차 이벤트 테스트</p>
-            <div class="bounty-form-grid">
-              <label>
-                테스트 스트리머
-                <input id="apiTestStreamerInput" type="text" placeholder="스트리머 아이디" />
-              </label>
-              <label>
-                펀딩 개수
-                <input id="apiTestAmountInput" type="number" min="1" step="1" placeholder="예: 300" />
-              </label>
-            </div>
-            <button id="apiTestBtn" class="ghost-btn" type="button">테스트 실행</button>
-            <p class="help-text">한개/한줄/전체 값과 정확히 일치할 때만 체크되어 있는 칸을 체크 해제합니다. 누적·배수 계산은 하지 않습니다.</p>
-          </div>
-
-          <div id="apiLogList" class="api-log-list" aria-live="polite"></div>
+          <p class="help-text">리셋 빙고일 때 송출 화면 아래 메뉴판에 표시되는 개수를 설정합니다.</p>
         </section>
 
         <section class="panel-card admin-only" data-admin-only>
