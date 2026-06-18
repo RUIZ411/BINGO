@@ -2234,3 +2234,7 @@ body.view-obs.obs-scale-50.is-reset-bingo .reset-score-box.chicken-box .score-la
 .api-log-item.action-all {
   border-color: rgba(255, 125, 153, .55);
 }
+
+.api-log-item.action-duplicate {
+  border-color: rgba(180, 160, 210, .55);
+}

@@ -71,6 +71,7 @@ const stateDefaults = {
     streamerIds: []
   },
   apiLogs: [],
+  processedEvents: {},
   bountyNumbers: [],
   bounties: {},
   memoText: "",
@@ -1170,6 +1171,7 @@ function normalizeApiLogs(value) {
     .filter(Boolean)
     .map((log) => ({
       id: String(log.id || `log_${log.createdAt || Date.now()}_${Math.random().toString(36).slice(2, 7)}`),
+      eventId: String(log.eventId || ""),
       source: String(log.source || "test"),
       streamerId: String(log.streamerId || "-"),
       amount: Math.max(0, Number(log.amount || 0)),
@@ -1182,10 +1184,46 @@ function normalizeApiLogs(value) {
     .slice(0, 30);
 }
 
+function normalizeProcessedEvents(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const entries = Object.entries(value)
+    .map(([eventId, createdAt]) => [
+      String(eventId || "").trim(),
+      Number(createdAt || Date.now())
+    ])
+    .filter(([eventId]) => eventId)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 200);
+
+  return Object.fromEntries(entries);
+}
+
+function hasProcessedEvent(draft, eventId) {
+  const events = normalizeProcessedEvents(draft.processedEvents);
+  return Boolean(eventId && events[eventId]);
+}
+
+function markProcessedEvent(draft, eventId) {
+  if (!eventId) return;
+
+  const events = normalizeProcessedEvents(draft.processedEvents);
+  events[eventId] = Date.now();
+
+  const limited = Object.entries(events)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 200);
+
+  draft.processedEvents = Object.fromEntries(limited);
+}
+
 function pushApiLog(draft, log) {
   const logs = normalizeApiLogs(draft.apiLogs);
   logs.unshift({
     id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    eventId: String(log.eventId || ""),
     source: log.source || "test",
     streamerId: log.streamerId || "-",
     amount: Math.max(0, Number(log.amount || 0)),
@@ -1212,6 +1250,31 @@ function saveApiConfig() {
   });
 }
 
+function createManualTestFundingEvent({ streamerId, amount }) {
+  return {
+    eventId: `manual_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    source: "manual-test",
+    eventType: "battleMissionFunding",
+    streamerId: normalizeStreamerId(streamerId),
+    amount: Number(amount || 0),
+    createdAt: Date.now()
+  };
+}
+
+function normalizeFundingEvent(event) {
+  const eventId = String(event?.eventId || "").trim()
+    || `${event?.source || "unknown"}_${event?.streamerId || "noid"}_${event?.amount || 0}_${event?.createdAt || Date.now()}`;
+
+  return {
+    eventId,
+    source: String(event?.source || "unknown"),
+    eventType: String(event?.eventType || "battleMissionFunding"),
+    streamerId: normalizeStreamerId(event?.streamerId),
+    amount: Number(event?.amount || 0),
+    createdAt: Number(event?.createdAt || Date.now())
+  };
+}
+
 function runApiTestEvent() {
   if (!isAdmin) {
     alert("방 입장 후 테스트할 수 있습니다.");
@@ -1233,52 +1296,88 @@ function runApiTestEvent() {
     return;
   }
 
+  const event = createManualTestFundingEvent({
+    streamerId,
+    amount
+  });
+
   commitState((draft) => {
-    applyExactFundingEventToDraft(draft, {
-      source: "test",
-      streamerId,
-      amount
-    });
+    handleFundingEventToDraft(draft, event);
   });
 }
 
-function applyExactFundingEventToDraft(draft, event) {
+function handleFundingEventToDraft(draft, rawEvent) {
+  const event = normalizeFundingEvent(rawEvent);
   const config = normalizeApiConfig(draft.apiConfig);
   const rewards = normalizeResetRewards(draft.resetRewards);
-  const streamerId = normalizeStreamerId(event.streamerId);
-  const amount = Number(event.amount || 0);
+
   let action = "none";
   let affectedCells = [];
   let result = "기준값과 일치하지 않아 실행하지 않음";
 
-  if (!config.enabled) {
-    result = "연동 OFF 상태라 실행하지 않음";
-  } else if (!config.streamerIds.includes(streamerId)) {
-    result = "등록되지 않은 스트리머 아이디라 실행하지 않음";
-  } else if (rewards.all > 0 && amount === rewards.all) {
-    action = "all";
-    affectedCells = uncheckAllCells(draft);
-    result = affectedCells.length ? `전체 ${affectedCells.length}칸 체크 해제` : "체크된 칸이 없어 실행할 내용 없음";
-  } else if (rewards.line > 0 && amount === rewards.line) {
-    action = "line";
-    affectedCells = uncheckRandomCheckedLine(draft);
-    result = affectedCells.length ? `랜덤 한줄 ${affectedCells.length}칸 체크 해제` : "체크된 칸이 포함된 줄이 없어 실행할 내용 없음";
-  } else if (rewards.one > 0 && amount === rewards.one) {
-    action = "single";
-    affectedCells = uncheckRandomCheckedCell(draft);
-    result = affectedCells.length ? "랜덤 한칸 체크 해제" : "체크된 칸이 없어 실행할 내용 없음";
+  if (hasProcessedEvent(draft, event.eventId)) {
+    pushApiLog(draft, {
+      eventId: event.eventId,
+      source: event.source,
+      streamerId: event.streamerId,
+      amount: event.amount,
+      action: "duplicate",
+      result: "이미 처리한 이벤트라 중복 실행하지 않음",
+      affectedCells: []
+    });
+
+    return {
+      action: "duplicate",
+      affectedCells: [],
+      result: "이미 처리한 이벤트"
+    };
   }
 
+  if (!config.enabled) {
+    result = "연동 OFF 상태라 실행하지 않음";
+  } else if (!event.streamerId) {
+    result = "스트리머 아이디가 없어 실행하지 않음";
+  } else if (!config.streamerIds.includes(event.streamerId)) {
+    result = "등록되지 않은 스트리머 아이디라 실행하지 않음";
+  } else if (!Number.isInteger(event.amount) || event.amount <= 0) {
+    result = "펀딩 개수가 올바르지 않아 실행하지 않음";
+  } else if (rewards.all > 0 && event.amount === rewards.all) {
+    action = "all";
+    affectedCells = uncheckAllCells(draft);
+    result = affectedCells.length
+      ? `전체 ${affectedCells.length}칸 체크 해제`
+      : "체크된 칸이 없어 실행할 내용 없음";
+  } else if (rewards.line > 0 && event.amount === rewards.line) {
+    action = "line";
+    affectedCells = uncheckRandomCheckedLine(draft);
+    result = affectedCells.length
+      ? `랜덤 한줄 ${affectedCells.length}칸 체크 해제`
+      : "체크된 칸이 포함된 줄이 없어 실행할 내용 없음";
+  } else if (rewards.one > 0 && event.amount === rewards.one) {
+    action = "single";
+    affectedCells = uncheckRandomCheckedCell(draft);
+    result = affectedCells.length
+      ? "랜덤 한칸 체크 해제"
+      : "체크된 칸이 없어 실행할 내용 없음";
+  }
+
+  markProcessedEvent(draft, event.eventId);
+
   pushApiLog(draft, {
-    source: event.source || "test",
-    streamerId,
-    amount,
+    eventId: event.eventId,
+    source: event.source,
+    streamerId: event.streamerId,
+    amount: event.amount,
     action,
     result,
     affectedCells
   });
 
-  return { action, affectedCells, result };
+  return {
+    action,
+    affectedCells,
+    result
+  };
 }
 
 function getLineIndexGroups(size) {
@@ -1371,7 +1470,13 @@ function renderApiPanelState() {
 }
 
 function getApiActionLabel(action) {
-  return ({ single: "한개", line: "한줄", all: "전체", none: "무시" })[action] || "무시";
+  return ({
+    single: "한개",
+    line: "한줄",
+    all: "전체",
+    none: "무시",
+    duplicate: "중복"
+  })[action] || "무시";
 }
 
 function updateResetMenuAdminState() {
@@ -1966,6 +2071,7 @@ function prepareStateForStorage(state) {
     updatedAt: Date.now(),
     apiConfig: normalizeApiConfig(state.apiConfig),
     apiLogs: normalizeApiLogs(state.apiLogs),
+    processedEvents: normalizeProcessedEvents(state.processedEvents),
     bounties: encodeBountiesForStorage(state.bounties),
     bountyNumbers: Object.keys(normalizeBounties(state.bounties))
   };
@@ -2006,6 +2112,7 @@ function normalizeState(raw) {
     resetRewards: normalizeResetRewards(raw?.resetRewards),
     apiConfig: normalizeApiConfig(raw?.apiConfig),
     apiLogs: normalizeApiLogs(raw?.apiLogs),
+    processedEvents: normalizeProcessedEvents(raw?.processedEvents),
     bounties: normalizeBounties(raw?.bounties, raw?.bountyNumbers),
     effectNonce: Number(raw?.effectNonce || 0),
     lastNewLines: Array.isArray(raw?.lastNewLines) ? raw.lastNewLines : [],
