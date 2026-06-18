@@ -2003,8 +2003,92 @@ body.view-home .view-tabs {
   letter-spacing: .18em;
 }
 
+
+
+.home-guide {
+  margin-top: 28px;
+  padding: 24px;
+  border: 2px solid rgba(255,255,255,.82);
+  border-radius: 30px;
+  background: linear-gradient(145deg, rgba(255,255,255,.72), rgba(255,248,252,.54));
+  box-shadow: 0 16px 42px rgba(178,116,158,.12);
+}
+
+.home-guide-head {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.home-guide-head h3 {
+  margin: 4px 0 8px;
+  color: #5b4562;
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+}
+
+.home-guide-head p:not(.eyebrow) {
+  margin: 0;
+  color: #927591;
+  font-weight: 850;
+  line-height: 1.55;
+}
+
+.guide-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.guide-step {
+  min-height: 150px;
+  position: relative;
+  padding: 18px 18px 16px;
+  border: 1px solid rgba(255,159,199,.35);
+  border-radius: 24px;
+  background: rgba(255,255,255,.72);
+  box-shadow: 0 12px 26px rgba(178,116,158,.09);
+}
+
+.guide-num {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  font-size: 17px;
+  font-weight: 950;
+  box-shadow: 0 8px 18px rgba(255,159,199,.26);
+}
+
+.guide-step strong {
+  display: block;
+  color: #6d4b70;
+  font-size: 18px;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.guide-step p {
+  margin: 8px 0 0;
+  color: #927591;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.guide-step b {
+  color: #cf6d9e;
+  font-weight: 950;
+}
+
 @media (max-width: 1180px) {
-  .room-grid {
+  .room-grid,
+  .guide-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -2013,8 +2097,13 @@ body.view-home .view-tabs {
   .home-screen {
     padding: 18px;
   }
-  .room-grid {
+  .room-grid,
+  .guide-steps {
     grid-template-columns: 1fr;
+  }
+
+  .home-guide {
+    padding: 18px;
   }
 }
 

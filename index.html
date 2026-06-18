@@ -28,10 +28,40 @@
       <div class="home-hero">
         <p class="eyebrow">ROOM SELECT</p>
         <h2>빙고 방 선택</h2>
-        <p>방을 생성하려면 관리자 코드를 입력하고, 생성된 5자리 입장 코드로 방에 접속하세요.</p>
+        <p>방을 생성하려면 관리자 계정으로 인증하고, 생성된 5자리 입장 코드로 방에 접속하세요.</p>
       </div>
       <div id="roomCards" class="room-grid" aria-live="polite"></div>
       <p class="home-help">방 코드는 접속 권한을 구분하기 위한 간편 코드입니다. 코드가 공유되면 같은 방을 조작할 수 있어요.</p>
+
+      <section class="home-guide" aria-label="사용 방법">
+        <div class="home-guide-head">
+          <p class="eyebrow">HOW TO USE</p>
+          <h3>사용 방법</h3>
+          <p>방을 먼저 만들고, 입장 코드로 접속한 뒤 빙고판을 생성해서 사용하면 됩니다.</p>
+        </div>
+        <div class="guide-steps">
+          <article class="guide-step">
+            <span class="guide-num">1</span>
+            <strong>방 생성</strong>
+            <p>원하는 방에서 <b>방 생성</b>을 누르고, 관리자 아이디와 비밀번호로 인증합니다.</p>
+          </article>
+          <article class="guide-step">
+            <span class="guide-num">2</span>
+            <strong>입장 코드 공유</strong>
+            <p>방이 생성되면 5자리 입장 코드가 발급됩니다. 이 코드를 함께 사용할 사람에게 공유하세요.</p>
+          </article>
+          <article class="guide-step">
+            <span class="guide-num">3</span>
+            <strong>빙고판 조작</strong>
+            <p>입장 후 빙고판 생성, 체크/복구, 현상금, 메모장, 칸 수정 모드를 사용할 수 있습니다.</p>
+          </article>
+          <article class="guide-step">
+            <span class="guide-num">4</span>
+            <strong>송출용 사용</strong>
+            <p>각 방의 <b>송출용</b> 버튼을 누르면 OBS에 넣기 좋은 전용 화면으로 열립니다.</p>
+          </article>
+        </div>
+      </section>
     </section>
 
     <div class="admin-toggle-row" id="adminToggleRow" hidden>
@@ -74,7 +104,7 @@
           <div id="localLoginBox" class="login-box" hidden>
             <label>
               로컬 관리자 PIN
-              <input id="localPin" type="password" placeholder="기본값 0305" />
+              <input id="localPin" type="password" placeholder="관리자 코드" />
             </label>
             <div class="row-buttons">
               <button id="localLoginBtn" class="primary-btn">관리자 열기</button>
@@ -306,6 +336,36 @@
         <button type="button" data-obs-scale="0.5">50%</button>
       </aside>
     </main>
+  </div>
+
+
+  <div id="roomAdminAuthModal" class="memo-modal admin-auth-modal" hidden>
+    <div class="memo-backdrop" data-admin-auth-close></div>
+    <div class="memo-dialog admin-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="roomAdminAuthTitle">
+      <div class="memo-head">
+        <div>
+          <p class="eyebrow">ADMIN AUTH</p>
+          <h2 id="roomAdminAuthTitle">관리자 인증</h2>
+        </div>
+        <button id="roomAdminAuthCloseBtn" class="memo-icon-btn" type="button" aria-label="관리자 인증 닫기">×</button>
+      </div>
+      <p id="roomAdminAuthMessage" class="room-gate-message">방 생성을 위해 관리자 계정으로 인증해 주세요.</p>
+      <label class="cell-edit-label">
+        관리자 아이디
+        <input id="roomAdminAuthEmail" class="cell-edit-input" type="text" placeholder="아이디만 입력, 예: suweet" autocomplete="username" />
+      </label>
+      <label class="cell-edit-label">
+        비밀번호
+        <input id="roomAdminAuthPassword" class="cell-edit-input" type="password" placeholder="관리자 비밀번호" autocomplete="current-password" />
+      </label>
+      <div class="memo-footer">
+        <p id="roomAdminAuthStatus" class="memo-status">@suweet.com은 자동으로 붙습니다.</p>
+        <div class="row-buttons memo-actions">
+          <button id="roomAdminAuthCancelBtn" class="ghost-btn" type="button">취소</button>
+          <button id="roomAdminAuthConfirmBtn" class="primary-btn" type="button">인증 후 진행</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="roomGateModal" class="memo-modal room-gate-modal" hidden>

@@ -85,6 +85,15 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 const els = {
   homeScreen: $("#homeScreen"),
   roomCards: $("#roomCards"),
+  roomAdminAuthModal: $("#roomAdminAuthModal"),
+  roomAdminAuthTitle: $("#roomAdminAuthTitle"),
+  roomAdminAuthMessage: $("#roomAdminAuthMessage"),
+  roomAdminAuthEmail: $("#roomAdminAuthEmail"),
+  roomAdminAuthPassword: $("#roomAdminAuthPassword"),
+  roomAdminAuthConfirmBtn: $("#roomAdminAuthConfirmBtn"),
+  roomAdminAuthCancelBtn: $("#roomAdminAuthCancelBtn"),
+  roomAdminAuthCloseBtn: $("#roomAdminAuthCloseBtn"),
+  roomAdminAuthStatus: $("#roomAdminAuthStatus"),
   roomGateModal: $("#roomGateModal"),
   roomGateInput: $("#roomGateInput"),
   roomGateEnterBtn: $("#roomGateEnterBtn"),
@@ -200,6 +209,8 @@ let cellSaveTimers = new Map();
 let obsScale = getInitialObsScale();
 let isEditMode = false;
 let editingCellIndex = null;
+let roomAdminAuthResolver = null;
+let roomAdminAuthBusy = false;
 
 if (!["public", "obs"].includes(activeView)) activeView = "public";
 if (!activeRoomId) activeView = "public";
@@ -424,12 +435,8 @@ async function createOrResetRoom(roomId) {
   if (!room) return;
 
   const alreadyExists = Boolean(roomSummaries?.[roomId]?.accessCode);
-  const adminCode = prompt(`${room.label}을 ${alreadyExists ? "초기화/재생성" : "생성"}하려면 관리자 코드를 입력해 주세요.`);
-  if (adminCode == null) return;
-  if (adminCode !== MASTER_ROOM_ADMIN_CODE) {
-    alert("관리자 코드가 맞지 않습니다.");
-    return;
-  }
+  const approved = await requestRoomAdminApproval(room.label, alreadyExists);
+  if (!approved) return;
   if (alreadyExists && !confirm(`${room.label}이 이미 있습니다. 새 입장 코드로 초기화할까요? 기존 빙고 데이터가 초기화됩니다.`)) return;
 
   const code = generateRoomCode();
@@ -453,6 +460,90 @@ async function createOrResetRoom(roomId) {
     console.error("방 생성 실패", error);
     alert("방 생성에 실패했습니다. Firebase Rules 또는 DB 연결을 확인해 주세요.");
   }
+}
+
+async function requestRoomAdminApproval(roomLabel, alreadyExists) {
+  if (isFirebaseEnabled && auth && els.roomAdminAuthModal) {
+    return openRoomAdminAuthModal(roomLabel, alreadyExists);
+  }
+
+  const adminCode = prompt(`${roomLabel}을 ${alreadyExists ? "초기화/재생성" : "생성"}하려면 관리자 코드를 입력해 주세요.`);
+  if (adminCode == null) return false;
+  if (adminCode !== MASTER_ROOM_ADMIN_CODE) {
+    alert("관리자 코드가 맞지 않습니다.");
+    return false;
+  }
+  return true;
+}
+
+function openRoomAdminAuthModal(roomLabel, alreadyExists) {
+  return new Promise((resolve) => {
+    roomAdminAuthResolver = resolve;
+    roomAdminAuthBusy = false;
+    if (els.roomAdminAuthTitle) els.roomAdminAuthTitle.textContent = alreadyExists ? "관리자 인증 · 방 초기화" : "관리자 인증 · 방 생성";
+    if (els.roomAdminAuthMessage) els.roomAdminAuthMessage.textContent = `${roomLabel}을 ${alreadyExists ? "초기화/코드 재발급" : "생성"}하려면 관리자 계정으로 인증해 주세요.`;
+    if (els.roomAdminAuthStatus) els.roomAdminAuthStatus.textContent = "아이디만 입력하면 @suweet.com이 자동으로 붙습니다.";
+    if (els.roomAdminAuthEmail) els.roomAdminAuthEmail.value = "";
+    if (els.roomAdminAuthPassword) els.roomAdminAuthPassword.value = "";
+    if (els.roomAdminAuthConfirmBtn) els.roomAdminAuthConfirmBtn.disabled = false;
+    els.roomAdminAuthModal.hidden = false;
+    document.body.classList.add("memo-open");
+    setTimeout(() => els.roomAdminAuthEmail?.focus(), 0);
+  });
+}
+
+function closeRoomAdminAuthModal(result = false) {
+  if (!els.roomAdminAuthModal || els.roomAdminAuthModal.hidden) return;
+  els.roomAdminAuthModal.hidden = true;
+  document.body.classList.remove("memo-open");
+  roomAdminAuthBusy = false;
+  if (els.roomAdminAuthConfirmBtn) els.roomAdminAuthConfirmBtn.disabled = false;
+  const resolver = roomAdminAuthResolver;
+  roomAdminAuthResolver = null;
+  if (resolver) resolver(Boolean(result));
+}
+
+async function confirmRoomAdminAuth() {
+  if (roomAdminAuthBusy) return;
+  const email = makeLoginEmail(els.roomAdminAuthEmail?.value);
+  const password = els.roomAdminAuthPassword?.value || "";
+
+  if (!email) {
+    if (els.roomAdminAuthStatus) els.roomAdminAuthStatus.textContent = "관리자 아이디를 입력해 주세요.";
+    els.roomAdminAuthEmail?.focus();
+    return;
+  }
+  if (!password) {
+    if (els.roomAdminAuthStatus) els.roomAdminAuthStatus.textContent = "비밀번호를 입력해 주세요.";
+    els.roomAdminAuthPassword?.focus();
+    return;
+  }
+
+  roomAdminAuthBusy = true;
+  if (els.roomAdminAuthConfirmBtn) els.roomAdminAuthConfirmBtn.disabled = true;
+  if (els.roomAdminAuthStatus) els.roomAdminAuthStatus.textContent = "관리자 계정 확인 중...";
+
+  try {
+    await verifyRoomAdminCredentials(email, password);
+    if (els.roomAdminAuthStatus) els.roomAdminAuthStatus.textContent = "인증 완료";
+    closeRoomAdminAuthModal(true);
+  } catch (error) {
+    console.error("관리자 인증 실패", error);
+    roomAdminAuthBusy = false;
+    if (els.roomAdminAuthConfirmBtn) els.roomAdminAuthConfirmBtn.disabled = false;
+    if (els.roomAdminAuthStatus) els.roomAdminAuthStatus.textContent = "아이디 또는 비밀번호를 확인해 주세요.";
+  }
+}
+
+async function verifyRoomAdminCredentials(email, password) {
+  /*
+    현재 버전은 Firebase Auth 이메일/비밀번호 계정으로 관리자 인증을 확인합니다.
+    Firebase Functions 검증 URL/함수명이 따로 있다면 이 함수 안만 교체하면 됩니다.
+    프론트 입력은 suweet처럼 아이디만 받아도 makeLoginEmail()에서 suweet@suweet.com으로 변환됩니다.
+  */
+  await setPersistence(auth, browserSessionPersistence);
+  await signInWithEmailAndPassword(auth, email, password);
+  return true;
 }
 
 function promptEnterRoom(roomId, view = "public") {
@@ -492,7 +583,7 @@ function renderRoomCards() {
     info.innerHTML = `
       <p class="eyebrow">${exists ? "READY" : "EMPTY"}</p>
       <h3>${escapeHtml(room.label)}</h3>
-      <p>${exists ? `${escapeHtml(data.title || "오늘의 빙고")} · ${typeLabel}` : "관리자 코드로 방을 생성하세요."}</p>
+      <p>${exists ? `${escapeHtml(data.title || "오늘의 빙고")} · ${typeLabel}` : "관리자 계정으로 방을 생성하세요."}</p>
     `;
 
     const actions = document.createElement("div");
@@ -539,6 +630,19 @@ function bindEvents() {
   els.roomGateHomeBtn?.addEventListener("click", () => {
     location.href = "./";
   });
+
+  els.roomAdminAuthCancelBtn?.addEventListener("click", () => closeRoomAdminAuthModal(false));
+  els.roomAdminAuthCloseBtn?.addEventListener("click", () => closeRoomAdminAuthModal(false));
+  els.roomAdminAuthModal?.addEventListener("click", (event) => {
+    if (event.target?.hasAttribute?.("data-admin-auth-close")) closeRoomAdminAuthModal(false);
+  });
+  els.roomAdminAuthConfirmBtn?.addEventListener("click", confirmRoomAdminAuth);
+  els.roomAdminAuthPassword?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      confirmRoomAdminAuth();
+    }
+  });
   els.copyRoomCodeBtn?.addEventListener("click", async () => {
     const code = currentState.accessCode || "";
     if (!code) return;
@@ -570,6 +674,7 @@ function bindEvents() {
     if (event.key === "Escape") {
       if (els.cellEditModal && !els.cellEditModal.hidden) closeCellEditModal();
       if (els.memoModal && !els.memoModal.hidden) closeMemoModal();
+      if (els.roomAdminAuthModal && !els.roomAdminAuthModal.hidden) closeRoomAdminAuthModal(false);
     }
 
     if (event.key === "Enter" && els.cellEditModal && !els.cellEditModal.hidden && document.activeElement === els.cellEditInput) {
