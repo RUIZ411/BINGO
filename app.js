@@ -37,15 +37,15 @@ const ROOM_OPTIONS = [
   { id: "room1", label: "1번 방" },
   { id: "room2", label: "2번 방" },
   { id: "room3", label: "3번 방" },
-  { id: "special", label: "전용방" }
+  { id: "special", label: "수힛방" }
 ];
 const ROOM_IDS = ROOM_OPTIONS.map((room) => room.id);
 const ROOM_LABELS = Object.fromEntries(ROOM_OPTIONS.map((room) => [room.id, room.label]));
-const MASTER_ROOM_ADMIN_CODE = "1234";
+const MASTER_ROOM_ADMIN_CODE = "0305";
 const LOCAL_STORAGE_KEY_PREFIX = "suweet-bingo-room-state-";
 const ROOM_SESSION_PREFIX = "suweet-bingo-room-access-";
 const OBS_SCALE_STORAGE_KEY = "bkg-bingo-obs-scale";
-const LOCAL_ADMIN_PIN = "1234";
+const LOCAL_ADMIN_PIN = "0305";
 const ADMIN_EMAIL_DOMAIN = "@suweet.com";
 const BINGO_TYPES = ["mission", "number", "alphabet", "reset"];
 const NUMBER_BINGO_SIZES = [5, 7, 10];

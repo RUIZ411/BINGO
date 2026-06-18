@@ -2017,3 +2017,33 @@ body.view-home .view-tabs {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Chicken counter readability boost */
+.chicken-box .score-label {
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.chicken-preview {
+  font-size: 20px;
+}
+
+body.view-obs .chicken-box .score-label {
+  font-size: 36px;
+}
+
+body.view-obs[data-obs-scale="0.5"] .chicken-box .score-label,
+body.view-obs.obs-scale-50 .chicken-box .score-label {
+  font-size: 44px;
+}
+
+body.view-obs.is-reset-bingo .reset-score-box.chicken-box .score-label {
+  font-size: 38px;
+}
+
+body.view-obs[data-obs-scale="0.5"].is-reset-bingo .reset-score-box.chicken-box .score-label,
+body.view-obs.obs-scale-50.is-reset-bingo .reset-score-box.chicken-box .score-label {
+  font-size: 46px;
+}
