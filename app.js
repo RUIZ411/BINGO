@@ -49,7 +49,12 @@ const LOCAL_ADMIN_PIN = "0305";
 const ADMIN_EMAIL_DOMAIN = "@suweet.com";
 const BINGO_TYPES = ["mission", "number", "alphabet", "reset"];
 const NUMBER_BINGO_SIZES = [5, 7, 10];
-
+const ADMIN_SECTIONS_BY_TYPE = {
+  mission: ["roomAuth", "createBingo", "cellEdit", "bounty", "chicken", "missionBulk", "globalManage"],
+  number: ["roomAuth", "createBingo", "cellEdit", "bounty", "chicken", "globalManage"],
+  alphabet: ["roomAuth", "createBingo", "cellEdit", "bounty", "chicken", "globalManage"],
+  reset: ["roomAuth", "createBingo", "cellEdit", "bounty", "chicken", "resetMenu", "globalManage"]
+};
 
 const stateDefaults = {
   roomId: "",
@@ -73,9 +78,6 @@ const stateDefaults = {
   completedLines: {},
   effectNonce: 0,
   lastNewLines: [],
-  drawnNumbers: [],
-  lastDrawnNumber: null,
-  lastDrawMatched: false,
   cells: []
 };
 
@@ -108,6 +110,7 @@ const els = {
   boardTitle: $("#boardTitle"),
   topbar: $("#topbar"),
   adminPanel: $("#adminPanel"),
+  adminSections: $$("[data-admin-section]"),
   adminToggleRow: $("#adminToggleRow"),
   adminToggle: $("#adminToggle"),
   loginStatus: $("#loginStatus"),
@@ -126,12 +129,6 @@ const els = {
   createBoardBtn: $("#createBoardBtn"),
   shuffleBtn: $("#shuffleBtn"),
   resetChecksBtn: $("#resetChecksBtn"),
-  numberDrawBtn: $("#numberDrawBtn"),
-  resetDrawBtn: $("#resetDrawBtn"),
-  lastDrawnNumber: $("#lastDrawnNumber"),
-  drawnCount: $("#drawnCount"),
-  remainingDrawCount: $("#remainingDrawCount"),
-  drawResultText: $("#drawResultText"),
   bountyPanel: $("#bountyPanel"),
   bountyNumberInput: $("#bountyNumberInput"),
   bountyAmountInput: $("#bountyAmountInput"),
@@ -147,6 +144,8 @@ const els = {
   resetRewardOne: $("#resetRewardOne"),
   resetRewardLine: $("#resetRewardLine"),
   resetRewardAll: $("#resetRewardAll"),
+  resetReleaseButtons: $$(".reset-release-btn"),
+  resetReleaseAllBtn: $("#resetReleaseAllBtn"),
   standardScoreStrip: $("#standardScoreStrip"),
   resetScoreMenu: $("#resetScoreMenu"),
   resetBingoCount: $("#resetBingoCount"),
@@ -787,7 +786,7 @@ function bindEvents() {
 
   els.typeSelect.addEventListener("change", () => {
     syncSizeSelectForType(els.typeSelect.value);
-    updateNumberDrawControls();
+    updateAdminPanelSections();
     updateBountyPanelState();
     updateResetMenuAdminState();
   });
@@ -806,9 +805,6 @@ function bindEvents() {
       draft.cells = buildCells(size, contentType);
       draft.completedLines = {};
       draft.bingoCount = 0;
-      draft.drawnNumbers = [];
-      draft.lastDrawnNumber = null;
-      draft.lastDrawMatched = false;
       draft.effectNonce += 1;
       draft.lastNewLines = [];
     });
@@ -818,11 +814,6 @@ function bindEvents() {
     commitState((draft) => {
       const texts = shuffleArray(draft.cells.map((cell) => cell.text));
       draft.cells = draft.cells.map((cell, index) => ({ ...cell, text: texts[index] }));
-      if (draft.contentType === "number") {
-        draft.drawnNumbers = [];
-        draft.lastDrawnNumber = null;
-        draft.lastDrawMatched = false;
-      }
     });
   });
 
@@ -831,16 +822,10 @@ function bindEvents() {
       draft.cells = draft.cells.map((cell) => ({ ...cell, cleared: false }));
       draft.completedLines = {};
       draft.bingoCount = 0;
-      draft.drawnNumbers = [];
-      draft.lastDrawnNumber = null;
-      draft.lastDrawMatched = false;
       draft.lastNewLines = [];
       draft.effectNonce += 1;
     });
   });
-
-  els.numberDrawBtn?.addEventListener("click", drawRandomNumber);
-  els.resetDrawBtn?.addEventListener("click", resetNumberDrawHistory);
 
   els.bountyAddBtn?.addEventListener("click", addOrUpdateBounty);
 
@@ -883,6 +868,17 @@ function bindEvents() {
       });
     });
   });
+
+
+  els.resetReleaseButtons?.forEach((button) => {
+    button.addEventListener("click", () => {
+      const lineType = button.dataset.lineType;
+      const lineIndex = Number(button.dataset.lineIndex);
+      releaseResetLine(lineType, lineIndex);
+    });
+  });
+
+  els.resetReleaseAllBtn?.addEventListener("click", releaseAllResetChecks);
 
   els.applyBulkBtn.addEventListener("click", () => {
     const lines = els.bulkText.value
@@ -1117,53 +1113,36 @@ function normalizeResetRewards(value) {
   };
 }
 
+function getAdminPanelType() {
+  return BINGO_TYPES.includes(els.typeSelect?.value) ? els.typeSelect.value : currentState.contentType || "mission";
+}
+
+function updateAdminPanelSections() {
+  const type = getAdminPanelType();
+  const allowedSections = new Set(ADMIN_SECTIONS_BY_TYPE[type] || ADMIN_SECTIONS_BY_TYPE.mission);
+
+  els.adminSections?.forEach((section) => {
+    const key = section.dataset.adminSection;
+    section.hidden = !allowedSections.has(key);
+  });
+}
+
 function updateResetMenuAdminState() {
-  const selectedType = els.typeSelect?.value || currentState.contentType;
-  const isReset = selectedType === "reset" || currentState.contentType === "reset";
+  const selectedType = getAdminPanelType();
+  const isReset = selectedType === "reset";
 
   if (els.resetMenuAdmin) {
     els.resetMenuAdmin.classList.toggle("is-muted", !isReset);
   }
 
-  [els.resetRewardOne, els.resetRewardLine, els.resetRewardAll].forEach((input) => {
+  const resetControlsDisabled = !isAdmin || activeView === "obs" || !isReset;
+  [els.resetRewardOne, els.resetRewardLine, els.resetRewardAll, els.resetReleaseAllBtn].forEach((input) => {
     if (!input) return;
-    input.disabled = !isAdmin || activeView === "obs";
+    input.disabled = resetControlsDisabled;
   });
-}
-
-function updateNumberDrawControls() {
-  const selectedType = els.typeSelect?.value || currentState.contentType;
-  const isNumberMode = currentState.contentType === "number" || selectedType === "number";
-  const drawn = normalizeDrawnNumbers(currentState.drawnNumbers);
-  const remaining = Math.max(0, 100 - drawn.length);
-
-  if (els.lastDrawnNumber) els.lastDrawnNumber.textContent = currentState.lastDrawnNumber ?? "-";
-  if (els.drawnCount) els.drawnCount.textContent = String(drawn.length);
-  if (els.remainingDrawCount) els.remainingDrawCount.textContent = String(remaining);
-
-  if (els.numberDrawBtn) {
-    els.numberDrawBtn.disabled = !isAdmin || activeView === "obs" || currentState.contentType !== "number" || remaining <= 0;
-  }
-  if (els.resetDrawBtn) {
-    els.resetDrawBtn.disabled = !isAdmin || activeView === "obs" || currentState.contentType !== "number" || drawn.length === 0;
-  }
-
-  if (!els.drawResultText) return;
-  if (currentState.contentType !== "number") {
-    els.drawResultText.textContent = selectedType === "number"
-      ? "빙고판 생성을 누르면 1~100 숫자판과 추첨 버튼을 사용할 수 있어요."
-      : "내용 타입이 숫자일 때 사용할 수 있어요.";
-    return;
-  }
-
-  if (currentState.lastDrawnNumber == null) {
-    els.drawResultText.textContent = "1~100 중 중복 없이 추첨하고, 빙고판에 있는 숫자는 자동으로 지워져요.";
-    return;
-  }
-
-  els.drawResultText.textContent = currentState.lastDrawMatched
-    ? `${currentState.lastDrawnNumber}번 추첨! 빙고판의 같은 숫자를 지웠어요.`
-    : `${currentState.lastDrawnNumber}번 추첨! 현재 빙고판에는 없는 숫자예요.`;
+  els.resetReleaseButtons?.forEach((button) => {
+    button.disabled = resetControlsDisabled;
+  });
 }
 
 function updateBountyPanelState() {
@@ -1389,112 +1368,6 @@ function getBountyAmountClass(value) {
   return "bounty-amount-long";
 }
 
-function drawRandomNumber() {
-  if (currentState.contentType !== "number") {
-    alert("숫자 타입 빙고판에서만 사용할 수 있습니다.");
-    return;
-  }
-
-  commitState((draft) => {
-    const drawn = new Set(normalizeDrawnNumbers(draft.drawnNumbers));
-    if (drawn.size >= 100) {
-      alert("1~100 숫자를 모두 추첨했습니다.");
-      return;
-    }
-
-    const pool = Array.from({ length: 100 }, (_, index) => index + 1).filter((number) => !drawn.has(number));
-    const picked = pool[Math.floor(Math.random() * pool.length)];
-    drawn.add(picked);
-
-    const matchedCell = draft.cells.find((cell) => String(cell.text).trim() === String(picked));
-    if (matchedCell) matchedCell.cleared = true;
-
-    draft.drawnNumbers = Array.from(drawn);
-    draft.lastDrawnNumber = picked;
-    draft.lastDrawMatched = Boolean(matchedCell);
-  });
-}
-
-function resetNumberDrawHistory() {
-  commitState((draft) => {
-    draft.drawnNumbers = [];
-    draft.lastDrawnNumber = null;
-    draft.lastDrawMatched = false;
-  });
-}
-
-function normalizeDrawnNumbers(value) {
-  return Array.from(new Set((Array.isArray(value) ? value : [])
-    .map((number) => Number(number))
-    .filter((number) => Number.isInteger(number) && number >= 1 && number <= 100)));
-}
-
-function normalizeLastDrawnNumber(value) {
-  if (value == null) return null;
-  const number = Number(value);
-  return Number.isInteger(number) && number >= 1 && number <= 100 ? number : null;
-}
-
-function render() {
-  if (!activeRoomId) {
-    renderRoomCards();
-    if (els.pageTitle) els.pageTitle.textContent = "빙고 방 선택";
-    return;
-  }
-
-  currentState = normalizeState(currentState);
-  updateRoomAccessState();
-
-  if (els.pageTitle) els.pageTitle.textContent = getViewTitle();
-  if (els.currentRoomName) els.currentRoomName.textContent = currentState.roomName || getRoomLabel(activeRoomId);
-  if (els.currentRoomCode) els.currentRoomCode.textContent = isAdmin ? (currentState.accessCode || "-") : "입장 후 표시";
-  if (els.roomInfoBox) els.roomInfoBox.hidden = false;
-  if (els.boardTitle) els.boardTitle.textContent = currentState.title;
-  if (els.titleInput) els.titleInput.value = currentState.title;
-  if (els.typeSelect) els.typeSelect.value = currentState.contentType;
-  syncSizeSelectForType(currentState.contentType, currentState.size);
-  const isResetBingo = currentState.contentType === "reset";
-  const isNumberBingo = currentState.contentType === "number";
-  const isLetterBingo = currentState.contentType === "alphabet" || currentState.contentType === "reset";
-  const resetRewards = normalizeResetRewards(currentState.resetRewards);
-  document.body.classList.toggle("is-reset-bingo", isResetBingo);
-  document.body.classList.toggle("is-number-bingo", isNumberBingo);
-  document.body.classList.toggle("is-letter-bingo", isLetterBingo);
-
-  if (els.chickenInput) els.chickenInput.value = String(currentState.chickenCount);
-  if (els.chickenPreview) els.chickenPreview.textContent = currentState.chickenCount;
-  if (els.bingoCount) els.bingoCount.textContent = currentState.bingoCount;
-  if (els.chickenCount) els.chickenCount.textContent = currentState.chickenCount;
-  if (els.resetBingoCount) els.resetBingoCount.textContent = currentState.bingoCount;
-  if (els.resetChickenCount) els.resetChickenCount.textContent = currentState.chickenCount;
-  if (els.resetRewardOne) els.resetRewardOne.value = String(resetRewards.one);
-  if (els.resetRewardLine) els.resetRewardLine.value = String(resetRewards.line);
-  if (els.resetRewardAll) els.resetRewardAll.value = String(resetRewards.all);
-  if (els.resetMenuOne) els.resetMenuOne.textContent = String(resetRewards.one);
-  if (els.resetMenuLine) els.resetMenuLine.textContent = String(resetRewards.line);
-  if (els.resetMenuAll) els.resetMenuAll.textContent = String(resetRewards.all);
-  if (els.standardScoreStrip) els.standardScoreStrip.hidden = isResetBingo;
-  if (els.resetScoreMenu) els.resetScoreMenu.hidden = !isResetBingo;
-  if (els.maxBingoCount) els.maxBingoCount.textContent = currentState.size * 2 + 2;
-  renderMemoState();
-  if (els.bingoBoard) els.bingoBoard.style.setProperty("--cell-size", currentState.size);
-
-  renderAdminLock();
-  renderEditModeState();
-  updateNumberDrawControls();
-  updateBountyPanelState();
-  updateResetMenuAdminState();
-  renderBoard();
-  renderLines();
-  maybePlayBingoEffect();
-}
-
-function getViewTitle() {
-  const roomName = currentState.roomName || getRoomLabel(activeRoomId);
-  if (activeView === "obs") return `${roomName} 송출용`;
-  return roomName;
-}
-
 function getTextLengthClass(value) {
   const length = Array.from(String(value || "").replace(/\s+/g, "")).length;
   if (length <= 4) return "text-short";
@@ -1524,8 +1397,6 @@ function renderAdminLock() {
     els.createBoardBtn,
     els.shuffleBtn,
     els.resetChecksBtn,
-    els.numberDrawBtn,
-    els.resetDrawBtn,
     els.bountyNumberInput,
     els.bountyAmountInput,
     els.bountyAddBtn,
@@ -1654,6 +1525,59 @@ function toggleCell(index) {
   });
 }
 
+function getResetLineIndexes(lineType, lineIndex, size = currentState.size) {
+  const safeSize = Number(size || 5);
+  const safeIndex = Number(lineIndex);
+  if (!Number.isInteger(safeIndex) || safeIndex < 0 || safeIndex >= safeSize) return [];
+
+  if (lineType === "row") {
+    return Array.from({ length: safeSize }, (_, col) => safeIndex * safeSize + col);
+  }
+
+  if (lineType === "col") {
+    return Array.from({ length: safeSize }, (_, row) => row * safeSize + safeIndex);
+  }
+
+  if (lineType === "diag" && safeIndex === 0) {
+    return Array.from({ length: safeSize }, (_, index) => index * safeSize + index);
+  }
+
+  if (lineType === "diag" && safeIndex === 1) {
+    return Array.from({ length: safeSize }, (_, index) => index * safeSize + (safeSize - 1 - index));
+  }
+
+  return [];
+}
+
+function releaseResetLine(lineType, lineIndex) {
+  if (currentState.contentType !== "reset") {
+    alert("리셋빙고에서만 사용할 수 있습니다.");
+    return;
+  }
+
+  const indexes = getResetLineIndexes(lineType, lineIndex, currentState.size);
+  if (!indexes.length) return;
+
+  commitState((draft) => {
+    indexes.forEach((index) => {
+      if (draft.cells[index]) draft.cells[index].cleared = false;
+    });
+  });
+}
+
+function releaseAllResetChecks() {
+  if (currentState.contentType !== "reset") {
+    alert("리셋빙고에서만 사용할 수 있습니다.");
+    return;
+  }
+
+  if (!confirm("리셋빙고 전체 체크를 해제할까요?")) return;
+
+  commitState((draft) => {
+    draft.cells = draft.cells.map((cell) => ({ ...cell, cleared: false }));
+  });
+}
+
 async function commitState(mutator) {
   if (!isAdmin) {
     alert("관리자 로그인 후 수정할 수 있습니다.");
@@ -1694,7 +1618,7 @@ async function saveWholeState(nextState) {
 }
 
 function prepareStateForStorage(state) {
-  return {
+  const prepared = {
     ...state,
     roomId: state.roomId || activeRoomId || "",
     roomName: state.roomName || getRoomLabel(activeRoomId),
@@ -1703,6 +1627,12 @@ function prepareStateForStorage(state) {
     bounties: encodeBountiesForStorage(state.bounties),
     bountyNumbers: Object.keys(normalizeBounties(state.bounties))
   };
+
+  delete prepared.drawnNumbers;
+  delete prepared.lastDrawnNumber;
+  delete prepared.lastDrawMatched;
+
+  return prepared;
 }
 
 function makeInitialState(roomId = activeRoomId) {
@@ -1741,11 +1671,8 @@ function normalizeState(raw) {
     bounties: normalizeBounties(raw?.bounties, raw?.bountyNumbers),
     effectNonce: Number(raw?.effectNonce || 0),
     lastNewLines: Array.isArray(raw?.lastNewLines) ? raw.lastNewLines : [],
-    drawnNumbers: normalizeDrawnNumbers(raw?.drawnNumbers),
     bountyNumbers: Object.keys(normalizeBounties(raw?.bounties, raw?.bountyNumbers)),
     memoText: String(raw?.memoText || ""),
-    lastDrawnNumber: normalizeLastDrawnNumber(raw?.lastDrawnNumber),
-    lastDrawMatched: Boolean(raw?.lastDrawMatched),
     cells
   }, raw?.completedLines || {});
 }

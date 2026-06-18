@@ -973,11 +973,7 @@ body.view-obs .board-title-block h2 {
   font-size: clamp(24px, 4vw, 38px);
 }
 
-/* Number draw controls */
-.number-draw-panel {
-  position: relative;
-}
-
+/* Compact counter preview chips */
 .draw-preview {
   display: inline-flex;
   align-items: center;
@@ -993,193 +989,6 @@ body.view-obs .board-title-block h2 {
 .draw-preview b {
   color: #df8b2e;
   font-size: 15px;
-}
-
-.draw-info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.draw-info-box {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-height: 64px;
-  justify-content: center;
-  padding: 10px 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 159, 199, .32);
-  background: rgba(255,255,255,.68);
-  box-shadow: inset 0 -3px 0 rgba(255,159,199,.07);
-}
-
-.draw-info-box span {
-  color: #b57ca2;
-  font-size: 12px;
-  font-weight: 950;
-  letter-spacing: .04em;
-}
-
-.draw-info-box strong {
-  color: #5b4562;
-  font-size: 24px;
-  line-height: 1;
-}
-
-/* OBS dark broadcast layout + right scale controls */
-:root {
-  --obs-scale: 1;
-}
-
-.obs-scale-panel {
-  display: none;
-}
-
-body.view-obs {
-  min-height: 100vh;
-  overflow: auto;
-  color: #5b4562;
-  background:
-    radial-gradient(circle at 20% 18%, rgba(255, 159, 199, .20), transparent 28rem),
-    radial-gradient(circle at 78% 22%, rgba(185, 167, 255, .20), transparent 30rem),
-    radial-gradient(circle at 50% 86%, rgba(159, 231, 255, .14), transparent 30rem),
-    linear-gradient(135deg, #161322 0%, #211733 46%, #141c28 100%);
-}
-
-body.view-obs::before {
-  display: block !important;
-  opacity: .18;
-  background-image:
-    radial-gradient(circle, rgba(255,255,255,.85) 0 1.5px, transparent 2px),
-    radial-gradient(circle, rgba(255,159,199,.42) 0 1px, transparent 1.8px);
-  background-size: 46px 46px, 82px 82px;
-}
-
-body.view-obs .app-shell {
-  width: 100%;
-  max-width: none;
-  min-height: 100vh;
-  padding: 28px 104px 28px 28px;
-}
-
-body.view-obs .layout {
-  min-height: calc(100vh - 56px);
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  margin-top: 0;
-}
-
-body.view-obs .stage {
-  width: max-content;
-  max-width: none;
-  margin: 0 auto;
-  padding: 30px 38px 32px;
-  border-radius: 38px;
-  border: 2px solid rgba(255,255,255,.92);
-  background:
-    radial-gradient(circle at 25% 12%, rgba(255, 235, 245, .78), transparent 21rem),
-    radial-gradient(circle at 78% 86%, rgba(227, 247, 255, .68), transparent 22rem),
-    rgba(255,255,255,.96);
-  box-shadow:
-    0 28px 90px rgba(0,0,0,.42),
-    0 0 0 1px rgba(255,255,255,.35),
-    inset 0 -5px 0 rgba(255,159,199,.08);
-  transform: scale(var(--obs-scale));
-  transform-origin: center top;
-}
-
-body.view-obs .board-title-block {
-  width: min(760px, 100%);
-  min-width: min(520px, calc(100vw - 180px));
-  margin: 0 auto 18px;
-  padding: 16px 24px 15px;
-  background: rgba(255,255,255,.88);
-  border-radius: 28px;
-  box-shadow: 0 16px 40px rgba(178,116,158,.13), inset 0 -3px 0 rgba(255,159,199,.1);
-}
-
-body.view-obs .board-title-block h2 {
-  font-size: clamp(30px, 3.4vw, 48px);
-}
-
-body.view-obs .board-wrap {
-  overflow: visible;
-  padding: 0;
-}
-
-body.view-obs .board-canvas {
-  background:
-    linear-gradient(135deg, rgba(255,255,255,.83), rgba(255,238,248,.69)),
-    linear-gradient(135deg, rgba(255,159,199,.24), rgba(185,167,255,.18));
-  border: 2px solid rgba(255,255,255,.96);
-  box-shadow: 0 20px 54px rgba(178,116,158,.16), inset 0 0 0 1px rgba(255,159,199,.11);
-}
-
-body.view-obs .score-strip {
-  margin: 20px 0 0;
-  gap: 14px;
-}
-
-body.view-obs .score-box {
-  min-width: 150px;
-  min-height: 66px;
-  border-radius: 24px;
-  background: rgba(255,255,255,.9);
-  border: 2px solid rgba(255,255,255,.96);
-  box-shadow: 0 16px 36px rgba(178,116,158,.13), inset 0 -3px 0 rgba(255,159,199,.11);
-}
-
-body.view-obs .obs-scale-panel {
-  position: fixed;
-  z-index: 60;
-  right: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 76px;
-  padding: 12px 10px;
-  border-radius: 22px;
-  border: 1px solid rgba(255,255,255,.22);
-  background: rgba(255,255,255,.12);
-  box-shadow: 0 18px 48px rgba(0,0,0,.28);
-  backdrop-filter: blur(14px);
-}
-
-body.view-obs .obs-scale-panel[hidden] {
-  display: none !important;
-}
-
-body.view-obs .obs-scale-panel p {
-  margin: 0 0 3px;
-  color: rgba(255,255,255,.82);
-  text-align: center;
-  font-size: 11px;
-  font-weight: 1000;
-  letter-spacing: -.03em;
-}
-
-body.view-obs .obs-scale-panel button {
-  width: 100%;
-  min-height: 40px;
-  border-radius: 999px;
-  color: rgba(255,255,255,.86);
-  font-size: 13px;
-  font-weight: 1000;
-  background: rgba(255,255,255,.14);
-  border: 1px solid rgba(255,255,255,.22);
-  box-shadow: inset 0 -2px 0 rgba(255,255,255,.05);
-}
-
-body.view-obs .obs-scale-panel button.active {
-  color: #fff;
-  background: linear-gradient(135deg, #ff9fc7, #b9a7ff);
-  border-color: transparent;
-  box-shadow: 0 9px 22px rgba(255,159,199,.24);
 }
 
 body.view-obs .obs-scale-panel button:hover {
@@ -1210,6 +1019,60 @@ body.view-obs .obs-scale-panel button:hover {
 .reset-reward-grid input {
   text-align: center;
   font-weight: 1000;
+}
+
+.reset-release-box {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(255, 188, 219, .72);
+  border-radius: 18px;
+  background: rgba(255, 248, 252, .72);
+}
+
+.mini-title {
+  margin: 0 0 10px;
+  color: #b779a0;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+}
+
+.reset-release-group {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.reset-release-group > span {
+  color: #7d637f;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.mini-button-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.mini-button-grid.five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.mini-button-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reset-release-btn,
+.reset-release-all {
+  min-height: 34px;
+  padding: 7px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.reset-release-all {
+  width: 100%;
+  margin-top: 12px;
 }
 
 .reset-score-menu {
@@ -1342,6 +1205,10 @@ body.view-obs.is-reset-bingo .reset-menu-row b {
 
   .reset-reward-grid {
     grid-template-columns: 1fr;
+  }
+
+  .mini-button-grid.five {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
