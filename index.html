@@ -20,8 +20,19 @@
       <nav class="view-tabs" aria-label="화면 전환">
         <a href="?view=public" data-view-link="public">메인 화면</a>
         <a href="?view=obs" data-view-link="obs">송출용</a>
+        <button id="memoOpenBtn" class="memo-open-btn" type="button">📝 메모장</button>
       </nav>
     </header>
+
+    <section class="home-screen" id="homeScreen" hidden>
+      <div class="home-hero">
+        <p class="eyebrow">ROOM SELECT</p>
+        <h2>빙고 방 선택</h2>
+        <p>방을 생성하려면 관리자 코드를 입력하고, 생성된 5자리 입장 코드로 방에 접속하세요.</p>
+      </div>
+      <div id="roomCards" class="room-grid" aria-live="polite"></div>
+      <p class="home-help">방 코드는 접속 권한을 구분하기 위한 간편 코드입니다. 코드가 공유되면 같은 방을 조작할 수 있어요.</p>
+    </section>
 
     <div class="admin-toggle-row" id="adminToggleRow" hidden>
       <button id="adminToggle" class="admin-toggle" type="button">관리자 패널 접기</button>
@@ -31,8 +42,18 @@
       <aside class="admin-panel" id="adminPanel" hidden>
         <section class="panel-card">
           <div class="panel-head">
-            <h2>관리자 로그인</h2>
+            <h2>방 권한</h2>
             <span id="loginStatus" class="status-pill">확인 중</span>
+          </div>
+
+          <div id="roomInfoBox" class="login-box room-info-box" hidden>
+            <div class="room-info-line"><span>현재 방</span><strong id="currentRoomName">-</strong></div>
+            <div class="room-info-line"><span>입장 코드</span><strong id="currentRoomCode">-</strong></div>
+            <div class="row-buttons">
+              <button id="copyRoomCodeBtn" class="primary-btn" type="button">코드 복사</button>
+              <button id="leaveRoomBtn" class="ghost-btn" type="button">방 나가기</button>
+            </div>
+            <p class="help-text">이 방에 접속한 뒤에는 기존 빙고 기능을 바로 조작할 수 있어요.</p>
           </div>
 
           <div id="firebaseLoginBox" class="login-box" hidden>
@@ -285,6 +306,27 @@
         <button type="button" data-obs-scale="0.5">50%</button>
       </aside>
     </main>
+  </div>
+
+  <div id="roomGateModal" class="memo-modal room-gate-modal" hidden>
+    <div class="memo-backdrop"></div>
+    <div class="memo-dialog room-gate-dialog" role="dialog" aria-modal="true" aria-labelledby="roomGateTitle">
+      <div class="memo-head">
+        <div>
+          <p class="eyebrow">ROOM CODE</p>
+          <h2 id="roomGateTitle">방 입장 코드</h2>
+        </div>
+      </div>
+      <p id="roomGateMessage" class="room-gate-message">5자리 입장 코드를 입력해 주세요.</p>
+      <input id="roomGateInput" class="cell-edit-input room-gate-input" type="text" inputmode="numeric" maxlength="5" placeholder="예: 48291" autocomplete="off" />
+      <div class="memo-footer">
+        <p class="memo-status">코드가 맞으면 이 방의 빙고판을 조작할 수 있어요.</p>
+        <div class="row-buttons memo-actions">
+          <button id="roomGateHomeBtn" class="ghost-btn" type="button">방 선택으로</button>
+          <button id="roomGateEnterBtn" class="primary-btn" type="button">입장</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="memoModal" class="memo-modal" hidden>

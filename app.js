@@ -32,8 +32,18 @@ const firebaseConfig = {
   measurementId: "G-4DW4SXCZR3"
 };
 
-const ROOM_PATH = "bingoRooms/main";
-const LOCAL_STORAGE_KEY = "bkg-bingo-v1-state";
+const ROOMS_PATH = "bingoRooms";
+const ROOM_OPTIONS = [
+  { id: "room1", label: "1번 방" },
+  { id: "room2", label: "2번 방" },
+  { id: "room3", label: "3번 방" },
+  { id: "special", label: "전용방" }
+];
+const ROOM_IDS = ROOM_OPTIONS.map((room) => room.id);
+const ROOM_LABELS = Object.fromEntries(ROOM_OPTIONS.map((room) => [room.id, room.label]));
+const MASTER_ROOM_ADMIN_CODE = "1234";
+const LOCAL_STORAGE_KEY_PREFIX = "suweet-bingo-room-state-";
+const ROOM_SESSION_PREFIX = "suweet-bingo-room-access-";
 const OBS_SCALE_STORAGE_KEY = "bkg-bingo-obs-scale";
 const LOCAL_ADMIN_PIN = "1234";
 const ADMIN_EMAIL_DOMAIN = "@suweet.com";
@@ -42,6 +52,11 @@ const NUMBER_BINGO_SIZES = [5, 7, 10];
 
 
 const stateDefaults = {
+  roomId: "",
+  roomName: "",
+  accessCode: "",
+  createdAt: 0,
+  updatedAt: 0,
   title: "오늘의 빙고",
   size: 5,
   contentType: "mission",
@@ -68,6 +83,18 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 const els = {
+  homeScreen: $("#homeScreen"),
+  roomCards: $("#roomCards"),
+  roomGateModal: $("#roomGateModal"),
+  roomGateInput: $("#roomGateInput"),
+  roomGateEnterBtn: $("#roomGateEnterBtn"),
+  roomGateHomeBtn: $("#roomGateHomeBtn"),
+  roomGateMessage: $("#roomGateMessage"),
+  roomInfoBox: $("#roomInfoBox"),
+  currentRoomName: $("#currentRoomName"),
+  currentRoomCode: $("#currentRoomCode"),
+  copyRoomCodeBtn: $("#copyRoomCodeBtn"),
+  leaveRoomBtn: $("#leaveRoomBtn"),
   pageTitle: $("#pageTitle"),
   boardTitle: $("#boardTitle"),
   topbar: $("#topbar"),
@@ -155,14 +182,18 @@ const els = {
   cellEditHelpText: $("#cellEditHelpText")
 };
 
-let currentState = makeInitialState();
+const urlParams = new URLSearchParams(location.search);
+let activeRoomId = normalizeRoomId(urlParams.get("room"));
+let currentState = makeInitialState(activeRoomId);
+let roomSummaries = {};
 let firebaseApp = null;
 let db = null;
 let auth = null;
+let roomsRef = null;
 let roomRef = null;
 let isFirebaseEnabled = Boolean(firebaseConfig.apiKey && firebaseConfig.databaseURL && firebaseConfig.projectId);
 let isAdmin = false;
-let activeView = new URLSearchParams(location.search).get("view") || "public";
+let activeView = urlParams.get("view") || "public";
 let lastRenderedEffectNonce = 0;
 let titleSaveTimer = null;
 let cellSaveTimers = new Map();
@@ -171,6 +202,7 @@ let isEditMode = false;
 let editingCellIndex = null;
 
 if (!["public", "obs"].includes(activeView)) activeView = "public";
+if (!activeRoomId) activeView = "public";
 
 init();
 
@@ -183,12 +215,34 @@ async function init() {
 }
 
 function setupView() {
+  const isHome = !activeRoomId;
+  document.body.classList.toggle("view-home", isHome);
   document.body.classList.add(`view-${activeView}`);
+
+  if (els.homeScreen) els.homeScreen.hidden = !isHome;
+  const layout = document.querySelector(".layout");
+  if (layout) layout.hidden = isHome;
+
   $$('[data-view-link]').forEach((link) => {
-    link.classList.toggle("active", link.dataset.viewLink === activeView);
+    const viewName = link.dataset.viewLink;
+    link.classList.toggle("active", !isHome && viewName === activeView);
+    if (!isHome && activeRoomId) {
+      link.href = `?room=${encodeURIComponent(activeRoomId)}&view=${encodeURIComponent(viewName)}`;
+    } else {
+      link.href = "#";
+    }
   });
 
-  if (els.memoOpenBtn) els.memoOpenBtn.hidden = activeView === "obs";
+  if (els.memoOpenBtn) els.memoOpenBtn.hidden = isHome || activeView === "obs";
+
+  if (isHome) {
+    if (els.adminPanel) els.adminPanel.hidden = true;
+    if (els.adminToggleRow) els.adminToggleRow.hidden = true;
+    if (els.cellEditorHelp) els.cellEditorHelp.hidden = true;
+    if (els.obsScalePanel) els.obsScalePanel.hidden = true;
+    if (els.pageTitle) els.pageTitle.textContent = "빙고 방 선택";
+    return;
+  }
 
   if (activeView !== "obs") {
     els.adminPanel.hidden = false;
@@ -203,35 +257,39 @@ function setupView() {
 
 function setupFirebaseIfAvailable() {
   if (!isFirebaseEnabled) {
-    els.localLoginBox.hidden = false;
-    els.firebaseLoginBox.hidden = true;
-    setLoginStatus("로컬 모드", "warn");
+    if (els.localLoginBox) els.localLoginBox.hidden = true;
+    if (els.firebaseLoginBox) els.firebaseLoginBox.hidden = true;
+    if (els.roomInfoBox) els.roomInfoBox.hidden = !activeRoomId;
+    setLoginStatus(activeRoomId ? "방 코드 필요" : "로컬 모드", "warn");
     return;
   }
 
   firebaseApp = initializeApp(firebaseConfig);
   db = getDatabase(firebaseApp);
   auth = getAuth(firebaseApp);
-  roomRef = ref(db, ROOM_PATH);
+  roomsRef = ref(db, ROOMS_PATH);
+  if (activeRoomId) roomRef = ref(db, `${ROOMS_PATH}/${activeRoomId}`);
 
-  els.firebaseLoginBox.hidden = false;
-  els.localLoginBox.hidden = true;
+  if (els.firebaseLoginBox) els.firebaseLoginBox.hidden = true;
+  if (els.localLoginBox) els.localLoginBox.hidden = true;
+  if (els.roomInfoBox) els.roomInfoBox.hidden = !activeRoomId;
 
-  onAuthStateChanged(auth, (user) => {
-    isAdmin = Boolean(user);
-    if (!isAdmin) {
-      isEditMode = false;
-      closeCellEditModal();
-    }
-    setLoginStatus(isAdmin ? "관리자 로그인됨" : "보기 전용", isAdmin ? "ok" : "warn");
-    renderAdminLock();
-    renderEditModeState();
-    renderBoard();
+  onValue(roomsRef, (snapshot) => {
+    roomSummaries = snapshot.exists() ? snapshot.val() : {};
+    renderRoomCards();
   });
 
+  if (!activeRoomId || !roomRef) return;
+
   onValue(roomRef, (snapshot) => {
-    if (!snapshot.exists()) return;
+    if (!snapshot.exists()) {
+      alert("아직 생성되지 않은 방입니다. 방 선택 화면으로 이동합니다.");
+      location.href = "./";
+      return;
+    }
     currentState = normalizeState(snapshot.val());
+    syncRoomAccessFromQuery();
+    updateRoomAccessState();
     render();
   }, (error) => {
     console.error("Firebase 실시간 수신 실패", error);
@@ -240,29 +298,262 @@ function setupFirebaseIfAvailable() {
 }
 
 async function loadInitialState() {
+  if (!activeRoomId) {
+    currentState = makeInitialState();
+    renderRoomCards();
+    return;
+  }
+
   if (isFirebaseEnabled) {
     try {
       const snapshot = await get(roomRef);
       if (snapshot.exists()) {
         currentState = normalizeState(snapshot.val());
+        syncRoomAccessFromQuery();
       } else {
-        currentState = makeInitialState();
-        // 방이 없을 때는 로그인한 관리자만 생성 가능. 미로그인 상태면 화면에 기본값만 표시됩니다.
-        if (auth.currentUser) await saveWholeState(currentState);
+        currentState = makeInitialState(activeRoomId);
       }
+      updateRoomAccessState();
     } catch (error) {
       console.error("Firebase DB 초기 불러오기 실패", error);
-      currentState = makeInitialState();
+      currentState = makeInitialState(activeRoomId);
       setLoginStatus("DB 연결 오류", "warn");
     }
     return;
   }
 
-  const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-  currentState = saved ? normalizeState(JSON.parse(saved)) : makeInitialState();
+  const saved = localStorage.getItem(getLocalStorageKey(activeRoomId));
+  currentState = saved ? normalizeState(JSON.parse(saved)) : makeInitialState(activeRoomId);
+  syncRoomAccessFromQuery();
+  updateRoomAccessState();
+}
+
+
+function normalizeRoomId(value) {
+  const roomId = String(value || "").trim();
+  return ROOM_IDS.includes(roomId) ? roomId : null;
+}
+
+function getRoomLabel(roomId) {
+  return ROOM_LABELS[roomId] || "빙고 방";
+}
+
+function getLocalStorageKey(roomId = activeRoomId) {
+  return `${LOCAL_STORAGE_KEY_PREFIX}${roomId || "main"}`;
+}
+
+function getRoomSessionKey(roomId = activeRoomId) {
+  return `${ROOM_SESSION_PREFIX}${roomId || "main"}`;
+}
+
+function generateRoomCode() {
+  return String(Math.floor(10000 + Math.random() * 90000));
+}
+
+function getStoredRoomCode(roomId = activeRoomId) {
+  return sessionStorage.getItem(getRoomSessionKey(roomId)) || localStorage.getItem(getRoomSessionKey(roomId)) || "";
+}
+
+function storeRoomCode(roomId, code) {
+  sessionStorage.setItem(getRoomSessionKey(roomId), String(code));
+}
+
+function clearRoomCode(roomId = activeRoomId) {
+  sessionStorage.removeItem(getRoomSessionKey(roomId));
+  localStorage.removeItem(getRoomSessionKey(roomId));
+}
+
+function isRoomUnlocked() {
+  if (!activeRoomId) return false;
+  const code = String(currentState.accessCode || "");
+  return Boolean(code && getStoredRoomCode(activeRoomId) === code);
+}
+
+function syncRoomAccessFromQuery() {
+  if (!activeRoomId) return;
+  const params = new URLSearchParams(location.search);
+  const code = params.get("code");
+  if (code && String(code) === String(currentState.accessCode || "")) {
+    storeRoomCode(activeRoomId, code);
+    params.delete("code");
+    const nextQuery = params.toString();
+    history.replaceState(null, "", `${location.pathname}${nextQuery ? `?${nextQuery}` : ""}`);
+  }
+}
+
+function updateRoomAccessState() {
+  isAdmin = isRoomUnlocked();
+  if (!isAdmin) {
+    isEditMode = false;
+    closeCellEditModal();
+  }
+  setLoginStatus(isAdmin ? "방 입장 완료" : "입장 코드 필요", isAdmin ? "ok" : "warn");
+  renderRoomGate();
+}
+
+function renderRoomGate() {
+  if (!els.roomGateModal || !activeRoomId || activeView === "obs") {
+    if (els.roomGateModal) els.roomGateModal.hidden = true;
+    return;
+  }
+  els.roomGateModal.hidden = isAdmin;
+  if (!isAdmin) {
+    if (els.roomGateMessage) els.roomGateMessage.textContent = `${getRoomLabel(activeRoomId)} 입장 코드를 입력해 주세요.`;
+    setTimeout(() => els.roomGateInput?.focus(), 0);
+  }
+}
+
+function enterCurrentRoomByCode() {
+  if (!activeRoomId) return;
+  const code = String(els.roomGateInput?.value || "").trim();
+  if (!/^\d{5}$/.test(code)) {
+    alert("5자리 숫자 코드를 입력해 주세요.");
+    return;
+  }
+  if (code !== String(currentState.accessCode || "")) {
+    alert("입장 코드가 맞지 않습니다.");
+    return;
+  }
+  storeRoomCode(activeRoomId, code);
+  updateRoomAccessState();
+  render();
+}
+
+async function createOrResetRoom(roomId) {
+  const room = ROOM_OPTIONS.find((item) => item.id === roomId);
+  if (!room) return;
+
+  const alreadyExists = Boolean(roomSummaries?.[roomId]?.accessCode);
+  const adminCode = prompt(`${room.label}을 ${alreadyExists ? "초기화/재생성" : "생성"}하려면 관리자 코드를 입력해 주세요.`);
+  if (adminCode == null) return;
+  if (adminCode !== MASTER_ROOM_ADMIN_CODE) {
+    alert("관리자 코드가 맞지 않습니다.");
+    return;
+  }
+  if (alreadyExists && !confirm(`${room.label}이 이미 있습니다. 새 입장 코드로 초기화할까요? 기존 빙고 데이터가 초기화됩니다.`)) return;
+
+  const code = generateRoomCode();
+  const fresh = makeInitialState(roomId);
+  fresh.roomId = roomId;
+  fresh.roomName = room.label;
+  fresh.accessCode = code;
+  fresh.createdAt = Date.now();
+  fresh.updatedAt = Date.now();
+
+  try {
+    if (isFirebaseEnabled && db) {
+      await set(ref(db, `${ROOMS_PATH}/${roomId}`), prepareStateForStorage(fresh));
+    } else {
+      localStorage.setItem(getLocalStorageKey(roomId), JSON.stringify(fresh));
+    }
+    storeRoomCode(roomId, code);
+    alert(`${room.label} 생성 완료!\n입장 코드: ${code}\n이 코드를 접속할 인원에게 알려주세요.`);
+    location.href = `?room=${encodeURIComponent(roomId)}&view=public`;
+  } catch (error) {
+    console.error("방 생성 실패", error);
+    alert("방 생성에 실패했습니다. Firebase Rules 또는 DB 연결을 확인해 주세요.");
+  }
+}
+
+function promptEnterRoom(roomId, view = "public") {
+  const room = roomSummaries?.[roomId];
+  const label = getRoomLabel(roomId);
+  if (!room?.accessCode) {
+    alert("아직 생성되지 않은 방입니다. 먼저 방 생성을 해주세요.");
+    return;
+  }
+  const cached = getStoredRoomCode(roomId);
+  if (cached && cached === String(room.accessCode)) {
+    location.href = `?room=${encodeURIComponent(roomId)}&view=${encodeURIComponent(view)}`;
+    return;
+  }
+  const code = prompt(`${label} 입장 코드 5자리를 입력해 주세요.`);
+  if (code == null) return;
+  if (String(code).trim() !== String(room.accessCode)) {
+    alert("입장 코드가 맞지 않습니다.");
+    return;
+  }
+  storeRoomCode(roomId, String(code).trim());
+  location.href = `?room=${encodeURIComponent(roomId)}&view=${encodeURIComponent(view)}`;
+}
+
+function renderRoomCards() {
+  if (!els.roomCards) return;
+  els.roomCards.innerHTML = "";
+  ROOM_OPTIONS.forEach((room) => {
+    const data = roomSummaries?.[room.id] || {};
+    const exists = Boolean(data.accessCode);
+    const card = document.createElement("article");
+    card.className = `room-card ${exists ? "is-created" : "is-empty"}`;
+
+    const info = document.createElement("div");
+    info.className = "room-card-info";
+    const typeLabel = exists ? getContentTypeLabel(data.contentType) : "비어 있음";
+    info.innerHTML = `
+      <p class="eyebrow">${exists ? "READY" : "EMPTY"}</p>
+      <h3>${escapeHtml(room.label)}</h3>
+      <p>${exists ? `${escapeHtml(data.title || "오늘의 빙고")} · ${typeLabel}` : "관리자 코드로 방을 생성하세요."}</p>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "room-card-actions";
+
+    const createBtn = document.createElement("button");
+    createBtn.type = "button";
+    createBtn.className = exists ? "ghost-btn" : "primary-btn";
+    createBtn.textContent = exists ? "초기화/코드 재발급" : "방 생성";
+    createBtn.addEventListener("click", () => createOrResetRoom(room.id));
+
+    const enterBtn = document.createElement("button");
+    enterBtn.type = "button";
+    enterBtn.className = "primary-btn";
+    enterBtn.textContent = "입장";
+    enterBtn.disabled = !exists;
+    enterBtn.addEventListener("click", () => promptEnterRoom(room.id, "public"));
+
+    const obsBtn = document.createElement("button");
+    obsBtn.type = "button";
+    obsBtn.className = "ghost-btn";
+    obsBtn.textContent = "송출용";
+    obsBtn.disabled = !exists;
+    obsBtn.addEventListener("click", () => promptEnterRoom(room.id, "obs"));
+
+    actions.append(createBtn, enterBtn, obsBtn);
+    card.append(info, actions);
+    els.roomCards.append(card);
+  });
+}
+
+function getContentTypeLabel(type) {
+  return ({ mission: "미션", number: "숫자", alphabet: "알파벳", reset: "리셋" })[type] || "미션";
 }
 
 function bindEvents() {
+  els.roomGateEnterBtn?.addEventListener("click", enterCurrentRoomByCode);
+  els.roomGateInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      enterCurrentRoomByCode();
+    }
+  });
+  els.roomGateHomeBtn?.addEventListener("click", () => {
+    location.href = "./";
+  });
+  els.copyRoomCodeBtn?.addEventListener("click", async () => {
+    const code = currentState.accessCode || "";
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      alert("입장 코드를 복사했어요.");
+    } catch {
+      prompt("입장 코드를 복사하세요.", code);
+    }
+  });
+  els.leaveRoomBtn?.addEventListener("click", () => {
+    clearRoomCode(activeRoomId);
+    location.href = "./";
+  });
+
   els.adminToggle?.addEventListener("click", () => {
     const collapsed = document.body.classList.toggle("admin-collapsed");
     els.adminToggle.textContent = collapsed ? "관리자 패널 열기" : "관리자 패널 접기";
@@ -514,7 +805,11 @@ function bindEvents() {
   els.hardResetBtn.addEventListener("click", () => {
     if (!confirm("전체 초기화할까요? 빙고판과 치킨 수가 모두 초기화됩니다.")) return;
     commitState((draft) => {
-      const fresh = makeInitialState();
+      const fresh = makeInitialState(activeRoomId);
+      fresh.accessCode = draft.accessCode;
+      fresh.roomId = draft.roomId || activeRoomId || "";
+      fresh.roomName = draft.roomName || getRoomLabel(activeRoomId);
+      fresh.createdAt = draft.createdAt || Date.now();
       Object.assign(draft, fresh);
     });
   });
@@ -1036,9 +1331,19 @@ function normalizeLastDrawnNumber(value) {
 }
 
 function render() {
+  if (!activeRoomId) {
+    renderRoomCards();
+    if (els.pageTitle) els.pageTitle.textContent = "빙고 방 선택";
+    return;
+  }
+
   currentState = normalizeState(currentState);
+  updateRoomAccessState();
 
   if (els.pageTitle) els.pageTitle.textContent = getViewTitle();
+  if (els.currentRoomName) els.currentRoomName.textContent = currentState.roomName || getRoomLabel(activeRoomId);
+  if (els.currentRoomCode) els.currentRoomCode.textContent = isAdmin ? (currentState.accessCode || "-") : "입장 후 표시";
+  if (els.roomInfoBox) els.roomInfoBox.hidden = false;
   if (els.boardTitle) els.boardTitle.textContent = currentState.title;
   if (els.titleInput) els.titleInput.value = currentState.title;
   if (els.typeSelect) els.typeSelect.value = currentState.contentType;
@@ -1080,8 +1385,9 @@ function render() {
 }
 
 function getViewTitle() {
-  if (activeView === "obs") return "송출용";
-  return "빙고 관리";
+  const roomName = currentState.roomName || getRoomLabel(activeRoomId);
+  if (activeView === "obs") return `${roomName} 송출용`;
+  return roomName;
 }
 
 function getTextLengthClass(value) {
@@ -1264,12 +1570,13 @@ async function saveWholeState(nextState) {
   render();
 
   if (isFirebaseEnabled) {
-    if (!auth.currentUser) {
-      alert("Firebase 모드에서는 관리자 로그인 후 저장할 수 있습니다.");
+    if (!roomRef) {
+      alert("방이 선택되지 않아 저장할 수 없습니다.");
       return;
     }
 
     try {
+      currentState.updatedAt = Date.now();
       await set(roomRef, prepareStateForStorage(currentState));
     } catch (error) {
       console.error("Firebase 저장 실패", error);
@@ -1278,19 +1585,25 @@ async function saveWholeState(nextState) {
     return;
   }
 
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentState));
+  localStorage.setItem(getLocalStorageKey(activeRoomId), JSON.stringify(currentState));
 }
 
 function prepareStateForStorage(state) {
   return {
     ...state,
+    roomId: state.roomId || activeRoomId || "",
+    roomName: state.roomName || getRoomLabel(activeRoomId),
+    accessCode: state.accessCode || currentState.accessCode || "",
+    updatedAt: Date.now(),
     bounties: encodeBountiesForStorage(state.bounties),
     bountyNumbers: Object.keys(normalizeBounties(state.bounties))
   };
 }
 
-function makeInitialState() {
+function makeInitialState(roomId = activeRoomId) {
   const base = structuredClone(stateDefaults);
+  base.roomId = roomId || "";
+  base.roomName = roomId ? getRoomLabel(roomId) : "";
   base.cells = buildCells(base.size, base.contentType);
   return applyBingoCalculation(base, {});
 }
@@ -1310,6 +1623,11 @@ function normalizeState(raw) {
   return applyBingoCalculation({
     ...stateDefaults,
     ...raw,
+    roomId: String(raw?.roomId || activeRoomId || ""),
+    roomName: String(raw?.roomName || getRoomLabel(activeRoomId)),
+    accessCode: String(raw?.accessCode || ""),
+    createdAt: Number(raw?.createdAt || 0),
+    updatedAt: Number(raw?.updatedAt || 0),
     title: String(raw?.title || "오늘의 빙고"),
     size,
     contentType,
