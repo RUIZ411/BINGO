@@ -482,7 +482,7 @@ function openRoomAdminAuthModal(roomLabel, alreadyExists) {
     roomAdminAuthBusy = false;
     if (els.roomAdminAuthTitle) els.roomAdminAuthTitle.textContent = alreadyExists ? "관리자 인증 · 방 초기화" : "관리자 인증 · 방 생성";
     if (els.roomAdminAuthMessage) els.roomAdminAuthMessage.textContent = `${roomLabel}을 ${alreadyExists ? "초기화/코드 재발급" : "생성"}하려면 관리자 계정으로 인증해 주세요.`;
-    if (els.roomAdminAuthStatus) els.roomAdminAuthStatus.textContent = "아이디만 입력하면 @suweet.com이 자동으로 붙습니다.";
+    if (els.roomAdminAuthStatus) els.roomAdminAuthStatus.textContent = "";
     if (els.roomAdminAuthEmail) els.roomAdminAuthEmail.value = "";
     if (els.roomAdminAuthPassword) els.roomAdminAuthPassword.value = "";
     if (els.roomAdminAuthConfirmBtn) els.roomAdminAuthConfirmBtn.disabled = false;
