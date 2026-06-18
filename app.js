@@ -1147,11 +1147,9 @@ function normalizeStreamerId(value) {
 }
 
 function normalizeStreamerIds(value) {
-  const source = Array.isArray(value) ? value.join("
-") : String(value || "");
+  const source = Array.isArray(value) ? value.join("\n") : String(value || "");
   return Array.from(new Set(source
-    .split(/[
-,]+/g)
+    .split(/[\n,]+/g)
     .map((item) => normalizeStreamerId(item))
     .filter(Boolean)));
 }
@@ -1341,8 +1339,7 @@ function renderApiPanelState() {
   if (els.apiEnabledInput) els.apiEnabledInput.checked = config.enabled;
 
   if (els.apiStreamerIdsInput && document.activeElement !== els.apiStreamerIdsInput) {
-    els.apiStreamerIdsInput.value = config.streamerIds.join("
-");
+    els.apiStreamerIdsInput.value = config.streamerIds.join("\n");
   }
 
   if (els.apiTestStreamerInput && document.activeElement !== els.apiTestStreamerInput && !els.apiTestStreamerInput.value.trim()) {
