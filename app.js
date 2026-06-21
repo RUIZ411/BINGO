@@ -1744,7 +1744,7 @@ function buildCells(size, contentType) {
   const validSize = getValidSizeForType(contentType, size);
   const count = validSize * validSize;
   const presetTexts = contentType === "number"
-    ? makeRandomNumberTexts(count)
+    ? makeNumberTexts(count, validSize)
     : (contentType === "alphabet" || contentType === "reset")
       ? makeRandomAlphabetTexts(count)
       : null;
@@ -1762,6 +1762,14 @@ function makeCellText(index, contentType) {
   if (contentType === "alphabet") return String.fromCharCode(65 + (index % 26));
   if (contentType === "reset") return makeRandomAlphabetTexts(25)[index] || "A";
   return `미션 ${index + 1}`;
+}
+
+function makeNumberTexts(count, size) {
+  if (size === 10 && count === 100) {
+    return Array.from({ length: 100 }, (_, index) => String(index + 1));
+  }
+
+  return makeRandomNumberTexts(count);
 }
 
 function makeRandomNumberTexts(count) {
