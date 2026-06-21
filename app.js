@@ -314,10 +314,19 @@ function setupFirebaseIfAvailable() {
     renderRoomCards();
   });
 
-  onValue(battleRoomsRef, (snapshot) => {
-    battleRoomSummaries = snapshot.exists() ? snapshot.val() : {};
-    renderRoomCards();
-  });
+  // 대결방 목록은 홈 화면에서만 불러옵니다.
+  // 기존 빙고방 화면에서는 battleRooms Rules가 아직 적용되지 않아도
+  // 빙고판 렌더링이 멈추지 않도록 분리합니다.
+  if (!activeRoomId && battleRoomsRef) {
+    onValue(battleRoomsRef, (snapshot) => {
+      battleRoomSummaries = snapshot.exists() ? snapshot.val() : {};
+      renderRoomCards();
+    }, (error) => {
+      console.warn("대결방 목록 수신 실패", error);
+      battleRoomSummaries = {};
+      renderRoomCards();
+    });
+  }
 
   if (!activeRoomId || !roomRef) return;
 

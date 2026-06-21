@@ -2487,3 +2487,34 @@ body.view-battle-obs .obs-scale-panel {
   .battle-board-grid { grid-template-columns: repeat(var(--battle-cell-size), 68px); grid-template-rows: repeat(var(--battle-cell-size), 68px); }
   .battle-cell span { font-size: 25px; }
 }
+
+
+/* Hotfix: 기존 빙고방 public 화면 레이아웃을 강제로 복구 */
+body.view-public:not(.view-battle):not(.view-battle-obs) .layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 390px !important;
+  gap: 20px !important;
+  align-items: start !important;
+}
+body.view-public:not(.view-battle):not(.view-battle-obs) .stage {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+}
+body.view-public:not(.view-battle):not(.view-battle-obs) .admin-panel {
+  display: flex !important;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  position: sticky !important;
+  top: 16px !important;
+  max-height: calc(100vh - 150px) !important;
+  overflow-y: auto !important;
+  padding-right: 4px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+body.view-public.admin-collapsed:not(.view-battle):not(.view-battle-obs) .layout {
+  grid-template-columns: 1fr !important;
+}
+body.view-public.admin-collapsed:not(.view-battle):not(.view-battle-obs) .admin-panel {
+  display: none !important;
+}

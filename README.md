@@ -73,3 +73,8 @@
 - 팀 1 직접 송출용: `?battleRoom=battle1&view=battleObs&team=0`
 - 팀 2 직접 송출용: `?battleRoom=battle1&view=battleObs&team=1`
 - 팀 3 직접 송출용: `?battleRoom=battle1&view=battleObs&team=2`
+
+
+## 핫픽스
+- 기존 빙고방 public 화면의 우측 관리자 패널/빙고판 렌더링 레이아웃을 강제 복구했습니다.
+- battleRooms Firebase Rules가 아직 반영되지 않은 상태에서도 기존 빙고방 화면이 멈추지 않도록 대결방 목록 수신을 홈 화면으로 분리했습니다.
