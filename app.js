@@ -262,13 +262,16 @@ async function init() {
 }
 
 function setupView() {
-  const isHome = !activeRoomId;
+  const isHome = !activeRoomId && !activeBattleRoomId;
   document.body.classList.toggle("view-home", isHome);
   document.body.classList.add(`view-${activeView}`);
 
   if (els.homeScreen) els.homeScreen.hidden = !isHome;
   const layout = document.querySelector(".layout");
-  if (layout) layout.hidden = isHome;
+  if (layout) {
+    layout.hidden = isHome;
+    layout.setAttribute("aria-hidden", isHome ? "true" : "false");
+  }
 
   $$('[data-view-link]').forEach((link) => {
     const viewName = link.dataset.viewLink;
@@ -1494,7 +1497,17 @@ function getNumberDigitClass(value) {
 
 
 function render() {
-  if (!activeRoomId) {
+  if (!activeRoomId && !activeBattleRoomId) {
+    document.body.classList.add("view-home");
+    if (els.homeScreen) els.homeScreen.hidden = false;
+    const layout = document.querySelector(".layout");
+    if (layout) {
+      layout.hidden = true;
+      layout.setAttribute("aria-hidden", "true");
+    }
+    if (els.adminPanel) els.adminPanel.hidden = true;
+    if (els.adminToggleRow) els.adminToggleRow.hidden = true;
+    if (els.obsScalePanel) els.obsScalePanel.hidden = true;
     renderRoomCards();
     if (els.pageTitle) els.pageTitle.textContent = "방 선택";
     return;

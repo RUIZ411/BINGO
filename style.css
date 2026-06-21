@@ -2664,3 +2664,27 @@ body.view-battle-obs .obs-scale-panel button:hover {
   body.view-battle.battle-size-10 .battle-cell.number-digit-2 span { font-size: 28px; }
   body.view-battle.battle-size-10 .battle-cell.number-digit-3 span { font-size: 23px; }
 }
+
+
+/* Home page cleanup: show only room cards and guide on the main screen. */
+body.view-home .layout,
+body.view-home .admin-toggle-row,
+body.view-home .obs-scale-panel,
+body.view-home #stage,
+body.view-home #adminPanel {
+  display: none !important;
+}
+
+body.view-home .home-screen {
+  display: block !important;
+}
+
+body.view-home .guide-steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  body.view-home .guide-steps {
+    grid-template-columns: 1fr;
+  }
+}
