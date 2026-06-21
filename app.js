@@ -4,7 +4,8 @@ import {
   ref,
   onValue,
   set,
-  get
+  get,
+  remove
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import {
   getAuth,
@@ -555,12 +556,14 @@ async function createOrResetRoom(roomId) {
   }
 }
 
-async function requestRoomAdminApproval(roomLabel, alreadyExists) {
+async function requestRoomAdminApproval(roomLabel, alreadyExists, actionLabel = "") {
+  const resolvedActionLabel = actionLabel || (alreadyExists ? "초기화/코드 재발급" : "생성");
+
   if (isFirebaseEnabled && auth && els.roomAdminAuthModal) {
-    return openRoomAdminAuthModal(roomLabel, alreadyExists);
+    return openRoomAdminAuthModal(roomLabel, resolvedActionLabel);
   }
 
-  const adminCode = prompt(`${roomLabel}을 ${alreadyExists ? "초기화/재생성" : "생성"}하려면 관리자 코드를 입력해 주세요.`);
+  const adminCode = prompt(`${roomLabel}을 ${resolvedActionLabel}하려면 관리자 코드를 입력해 주세요.`);
   if (adminCode == null) return false;
   if (adminCode !== MASTER_ROOM_ADMIN_CODE) {
     alert("관리자 코드가 맞지 않습니다.");
@@ -569,12 +572,12 @@ async function requestRoomAdminApproval(roomLabel, alreadyExists) {
   return true;
 }
 
-function openRoomAdminAuthModal(roomLabel, alreadyExists) {
+function openRoomAdminAuthModal(roomLabel, actionLabel = "생성") {
   return new Promise((resolve) => {
     roomAdminAuthResolver = resolve;
     roomAdminAuthBusy = false;
-    if (els.roomAdminAuthTitle) els.roomAdminAuthTitle.textContent = alreadyExists ? "관리자 인증 · 방 초기화" : "관리자 인증 · 방 생성";
-    if (els.roomAdminAuthMessage) els.roomAdminAuthMessage.textContent = `${roomLabel}을 ${alreadyExists ? "초기화/코드 재발급" : "생성"}하려면 관리자 계정으로 인증해 주세요.`;
+    if (els.roomAdminAuthTitle) els.roomAdminAuthTitle.textContent = `관리자 인증 · 방 ${actionLabel}`;
+    if (els.roomAdminAuthMessage) els.roomAdminAuthMessage.textContent = `${roomLabel}을 ${actionLabel}하려면 관리자 계정으로 인증해 주세요.`;
     if (els.roomAdminAuthStatus) els.roomAdminAuthStatus.textContent = "";
     if (els.roomAdminAuthEmail) els.roomAdminAuthEmail.value = "";
     if (els.roomAdminAuthPassword) els.roomAdminAuthPassword.value = "";
@@ -661,6 +664,50 @@ function promptEnterRoom(roomId, view = "public") {
   location.href = `?room=${encodeURIComponent(roomId)}&view=${encodeURIComponent(view)}`;
 }
 
+async function closeCreatedRoom(roomId, type) {
+  const isBattle = type === "battle";
+  const options = isBattle ? BATTLE_ROOM_OPTIONS : ROOM_OPTIONS;
+  const summaries = isBattle ? battleRoomSummaries : roomSummaries;
+  const room = options.find((item) => item.id === roomId);
+  const label = isBattle ? getBattleRoomLabel(roomId) : getRoomLabel(roomId);
+
+  if (!room || !summaries?.[roomId]?.accessCode) {
+    alert("이미 종료되었거나 생성되지 않은 방입니다.");
+    return;
+  }
+
+  const approved = await requestRoomAdminApproval(label, true, "종료");
+  if (!approved) return;
+  if (!confirm(`${label}을 종료할까요?
+방 데이터와 입장 코드가 삭제되고, 방 목록에서 EMPTY 상태로 돌아갑니다.`)) return;
+
+  try {
+    if (isFirebaseEnabled && db) {
+      await remove(ref(db, `${isBattle ? BATTLE_ROOMS_PATH : ROOMS_PATH}/${roomId}`));
+    } else if (isBattle) {
+      localStorage.removeItem(getBattleLocalStorageKey(roomId));
+    } else {
+      localStorage.removeItem(getLocalStorageKey(roomId));
+    }
+
+    if (isBattle) {
+      clearBattleRoomCode(roomId);
+      battleRoomSummaries = { ...(battleRoomSummaries || {}) };
+      delete battleRoomSummaries[roomId];
+    } else {
+      clearRoomCode(roomId);
+      roomSummaries = { ...(roomSummaries || {}) };
+      delete roomSummaries[roomId];
+    }
+
+    renderRoomCards();
+    alert(`${label}이 종료되었습니다.`);
+  } catch (error) {
+    console.error("방 종료 실패", error);
+    alert("방 종료에 실패했습니다. Firebase Rules 또는 DB 연결을 확인해 주세요.");
+  }
+}
+
 function renderRoomCards() {
   if (!els.roomCards) return;
   els.roomCards.innerHTML = "";
@@ -715,6 +762,16 @@ function renderRoomCards() {
     obsBtn.addEventListener("click", () => type === "battle" ? promptEnterBattleRoom(room.id, "battleObs") : promptEnterRoom(room.id, "obs"));
 
     actions.append(createBtn, enterBtn, obsBtn);
+
+    if (exists) {
+      const closeBtn = document.createElement("button");
+      closeBtn.type = "button";
+      closeBtn.className = "ghost-btn danger-soft";
+      closeBtn.textContent = "방 종료";
+      closeBtn.addEventListener("click", () => closeCreatedRoom(room.id, type));
+      actions.append(closeBtn);
+    }
+
     card.append(info, actions);
     els.roomCards.append(card);
   };
