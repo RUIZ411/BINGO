@@ -206,7 +206,7 @@ let activeRoomId = normalizeRoomId(urlParams.get("room"));
 let activeBattleRoomId = normalizeBattleRoomId(urlParams.get("battleRoom"));
 if (activeBattleRoomId) activeRoomId = null;
 let currentState = makeInitialState(activeRoomId);
-let currentBattleState = makeInitialBattleState(activeBattleRoomId);
+let currentBattleState = null;
 let roomSummaries = {};
 let battleRoomSummaries = {};
 let firebaseApp = null;
@@ -237,8 +237,8 @@ if (activeBattleRoomId) {
   if (!activeRoomId) activeView = "public";
 }
 
-if (activeBattleRoomId) initBattle();
-else init();
+// 앱 시작은 모든 함수/상수 선언이 끝난 뒤 startApp()에서 실행합니다.
+// 대결방 상수 초기화 전에 initBattle()가 실행되어 홈 화면까지 멈추는 문제를 방지합니다.
 
 async function init() {
   setupView();
@@ -2065,7 +2065,7 @@ function prepareBattleStateForStorage(state) {
     ...state,
     roomId: state.roomId || activeBattleRoomId || "",
     roomName: state.roomName || getBattleRoomLabel(activeBattleRoomId),
-    accessCode: state.accessCode || currentBattleState.accessCode || "",
+    accessCode: state.accessCode || currentBattleState?.accessCode || "",
     updatedAt: Date.now()
   };
 }
@@ -2579,3 +2579,25 @@ function setLoginStatus(text, mode) {
   els.loginStatus.classList.remove("ok", "warn");
   if (mode) els.loginStatus.classList.add(mode);
 }
+
+
+async function startApp() {
+  try {
+    if (activeBattleRoomId) await initBattle();
+    else await init();
+  } catch (error) {
+    console.error("앱 시작 실패", error);
+    // 어떤 오류가 나도 첫 화면은 방 선택 목록을 보여주도록 안전하게 복구합니다.
+    try {
+      activeRoomId = null;
+      activeBattleRoomId = null;
+      activeView = "public";
+      setupView();
+      renderRoomCards();
+    } catch (fallbackError) {
+      console.error("방 선택 화면 복구 실패", fallbackError);
+    }
+  }
+}
+
+startApp();
