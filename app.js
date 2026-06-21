@@ -33,17 +33,28 @@ const firebaseConfig = {
 };
 
 const ROOMS_PATH = "bingoRooms";
+const BATTLE_ROOMS_PATH = "battleRooms";
 const ROOM_OPTIONS = [
   { id: "room1", label: "1번 방" },
   { id: "room2", label: "2번 방" },
   { id: "room3", label: "3번 방" },
   { id: "special", label: "수힛방" }
 ];
+const BATTLE_ROOM_OPTIONS = [
+  { id: "battle1", label: "대결방 1" },
+  { id: "battle2", label: "대결방 2" },
+  { id: "battle3", label: "대결방 3" },
+  { id: "battle4", label: "대결방 4" }
+];
 const ROOM_IDS = ROOM_OPTIONS.map((room) => room.id);
+const BATTLE_ROOM_IDS = BATTLE_ROOM_OPTIONS.map((room) => room.id);
 const ROOM_LABELS = Object.fromEntries(ROOM_OPTIONS.map((room) => [room.id, room.label]));
+const BATTLE_ROOM_LABELS = Object.fromEntries(BATTLE_ROOM_OPTIONS.map((room) => [room.id, room.label]));
 const MASTER_ROOM_ADMIN_CODE = "0305";
 const LOCAL_STORAGE_KEY_PREFIX = "suweet-bingo-room-state-";
+const BATTLE_LOCAL_STORAGE_KEY_PREFIX = "suweet-battle-room-state-";
 const ROOM_SESSION_PREFIX = "suweet-bingo-room-access-";
+const BATTLE_SESSION_PREFIX = "suweet-battle-room-access-";
 const OBS_SCALE_STORAGE_KEY = "bkg-bingo-obs-scale";
 const LOCAL_ADMIN_PIN = "0305";
 const ADMIN_EMAIL_DOMAIN = "@suweet.com";
@@ -192,13 +203,19 @@ const els = {
 
 const urlParams = new URLSearchParams(location.search);
 let activeRoomId = normalizeRoomId(urlParams.get("room"));
+let activeBattleRoomId = normalizeBattleRoomId(urlParams.get("battleRoom"));
+if (activeBattleRoomId) activeRoomId = null;
 let currentState = makeInitialState(activeRoomId);
+let currentBattleState = makeInitialBattleState(activeBattleRoomId);
 let roomSummaries = {};
+let battleRoomSummaries = {};
 let firebaseApp = null;
 let db = null;
 let auth = null;
 let roomsRef = null;
 let roomRef = null;
+let battleRoomsRef = null;
+let battleRoomRef = null;
 let isFirebaseEnabled = Boolean(firebaseConfig.apiKey && firebaseConfig.databaseURL && firebaseConfig.projectId);
 let isAdmin = false;
 let activeView = urlParams.get("view") || "public";
@@ -210,11 +227,18 @@ let isEditMode = false;
 let editingCellIndex = null;
 let roomAdminAuthResolver = null;
 let roomAdminAuthBusy = false;
+let isBattleAdmin = false;
+let battleActiveTeamIndex = Math.max(0, Math.min(2, Number(urlParams.get("team") || 0)));
 
-if (!["public", "obs"].includes(activeView)) activeView = "public";
-if (!activeRoomId) activeView = "public";
+if (activeBattleRoomId) {
+  if (!["public", "battleObs"].includes(activeView)) activeView = "public";
+} else {
+  if (!["public", "obs"].includes(activeView)) activeView = "public";
+  if (!activeRoomId) activeView = "public";
+}
 
-init();
+if (activeBattleRoomId) initBattle();
+else init();
 
 async function init() {
   setupView();
@@ -250,7 +274,7 @@ function setupView() {
     if (els.adminToggleRow) els.adminToggleRow.hidden = true;
     if (els.cellEditorHelp) els.cellEditorHelp.hidden = true;
     if (els.obsScalePanel) els.obsScalePanel.hidden = true;
-    if (els.pageTitle) els.pageTitle.textContent = "빙고 방 선택";
+    if (els.pageTitle) els.pageTitle.textContent = "방 선택";
     return;
   }
 
@@ -278,6 +302,7 @@ function setupFirebaseIfAvailable() {
   db = getDatabase(firebaseApp);
   auth = getAuth(firebaseApp);
   roomsRef = ref(db, ROOMS_PATH);
+  battleRoomsRef = ref(db, BATTLE_ROOMS_PATH);
   if (activeRoomId) roomRef = ref(db, `${ROOMS_PATH}/${activeRoomId}`);
 
   if (els.firebaseLoginBox) els.firebaseLoginBox.hidden = true;
@@ -286,6 +311,11 @@ function setupFirebaseIfAvailable() {
 
   onValue(roomsRef, (snapshot) => {
     roomSummaries = snapshot.exists() ? snapshot.val() : {};
+    renderRoomCards();
+  });
+
+  onValue(battleRoomsRef, (snapshot) => {
+    battleRoomSummaries = snapshot.exists() ? snapshot.val() : {};
     renderRoomCards();
   });
 
@@ -344,6 +374,15 @@ function normalizeRoomId(value) {
   return ROOM_IDS.includes(roomId) ? roomId : null;
 }
 
+function normalizeBattleRoomId(value) {
+  const roomId = String(value || "").trim();
+  return BATTLE_ROOM_IDS.includes(roomId) ? roomId : null;
+}
+
+function getBattleRoomLabel(roomId) {
+  return BATTLE_ROOM_LABELS[roomId] || "대결방";
+}
+
 function getRoomLabel(roomId) {
   return ROOM_LABELS[roomId] || "빙고 방";
 }
@@ -354,6 +393,14 @@ function getLocalStorageKey(roomId = activeRoomId) {
 
 function getRoomSessionKey(roomId = activeRoomId) {
   return `${ROOM_SESSION_PREFIX}${roomId || "main"}`;
+}
+
+function getBattleLocalStorageKey(roomId = activeBattleRoomId) {
+  return `${BATTLE_LOCAL_STORAGE_KEY_PREFIX}${roomId || "main"}`;
+}
+
+function getBattleRoomSessionKey(roomId = activeBattleRoomId) {
+  return `${BATTLE_SESSION_PREFIX}${roomId || "main"}`;
 }
 
 function generateRoomCode() {
@@ -371,6 +418,19 @@ function storeRoomCode(roomId, code) {
 function clearRoomCode(roomId = activeRoomId) {
   sessionStorage.removeItem(getRoomSessionKey(roomId));
   localStorage.removeItem(getRoomSessionKey(roomId));
+}
+
+function getStoredBattleRoomCode(roomId = activeBattleRoomId) {
+  return sessionStorage.getItem(getBattleRoomSessionKey(roomId)) || localStorage.getItem(getBattleRoomSessionKey(roomId)) || "";
+}
+
+function storeBattleRoomCode(roomId, code) {
+  sessionStorage.setItem(getBattleRoomSessionKey(roomId), String(code));
+}
+
+function clearBattleRoomCode(roomId = activeBattleRoomId) {
+  sessionStorage.removeItem(getBattleRoomSessionKey(roomId));
+  localStorage.removeItem(getBattleRoomSessionKey(roomId));
 }
 
 function isRoomUnlocked() {
@@ -570,19 +630,31 @@ function promptEnterRoom(roomId, view = "public") {
 function renderRoomCards() {
   if (!els.roomCards) return;
   els.roomCards.innerHTML = "";
-  ROOM_OPTIONS.forEach((room) => {
-    const data = roomSummaries?.[room.id] || {};
+
+  const addGroupTitle = (eyebrow, title, help) => {
+    const group = document.createElement("div");
+    group.className = "room-group-title";
+    group.innerHTML = `<p class="eyebrow">${escapeHtml(eyebrow)}</p><h3>${escapeHtml(title)}</h3><p>${escapeHtml(help)}</p>`;
+    els.roomCards.append(group);
+  };
+
+  const addCard = ({ room, data, type }) => {
     const exists = Boolean(data.accessCode);
     const card = document.createElement("article");
-    card.className = `room-card ${exists ? "is-created" : "is-empty"}`;
+    card.className = `room-card ${exists ? "is-created" : "is-empty"} ${type === "battle" ? "battle-room-card" : ""}`;
 
     const info = document.createElement("div");
     info.className = "room-card-info";
-    const typeLabel = exists ? getContentTypeLabel(data.contentType) : "비어 있음";
+    const typeLabel = type === "battle"
+      ? (exists ? `숫자 ${Number(data.battle?.size || 5)}×${Number(data.battle?.size || 5)} · ${Number(data.battle?.playerCount || 2)}팀` : "비어 있음")
+      : (exists ? getContentTypeLabel(data.contentType) : "비어 있음");
+    const subtitle = type === "battle"
+      ? (exists ? `${escapeHtml(data.battle?.title || "숫자빙고 대결")} · ${typeLabel}` : "관리자 계정으로 대결방을 생성하세요.")
+      : (exists ? `${escapeHtml(data.title || "오늘의 빙고")} · ${typeLabel}` : "관리자 계정으로 방을 생성하세요.");
     info.innerHTML = `
       <p class="eyebrow">${exists ? "READY" : "EMPTY"}</p>
       <h3>${escapeHtml(room.label)}</h3>
-      <p>${exists ? `${escapeHtml(data.title || "오늘의 빙고")} · ${typeLabel}` : "관리자 계정으로 방을 생성하세요."}</p>
+      <p>${subtitle}</p>
     `;
 
     const actions = document.createElement("div");
@@ -592,26 +664,32 @@ function renderRoomCards() {
     createBtn.type = "button";
     createBtn.className = exists ? "ghost-btn" : "primary-btn";
     createBtn.textContent = exists ? "초기화/코드 재발급" : "방 생성";
-    createBtn.addEventListener("click", () => createOrResetRoom(room.id));
+    createBtn.addEventListener("click", () => type === "battle" ? createOrResetBattleRoom(room.id) : createOrResetRoom(room.id));
 
     const enterBtn = document.createElement("button");
     enterBtn.type = "button";
     enterBtn.className = "primary-btn";
     enterBtn.textContent = "입장";
     enterBtn.disabled = !exists;
-    enterBtn.addEventListener("click", () => promptEnterRoom(room.id, "public"));
+    enterBtn.addEventListener("click", () => type === "battle" ? promptEnterBattleRoom(room.id, "public") : promptEnterRoom(room.id, "public"));
 
     const obsBtn = document.createElement("button");
     obsBtn.type = "button";
     obsBtn.className = "ghost-btn";
     obsBtn.textContent = "송출용";
     obsBtn.disabled = !exists;
-    obsBtn.addEventListener("click", () => promptEnterRoom(room.id, "obs"));
+    obsBtn.addEventListener("click", () => type === "battle" ? promptEnterBattleRoom(room.id, "battleObs") : promptEnterRoom(room.id, "obs"));
 
     actions.append(createBtn, enterBtn, obsBtn);
     card.append(info, actions);
     els.roomCards.append(card);
-  });
+  };
+
+  addGroupTitle("BINGO ROOM", "빙고 방", "기존 빙고 기능을 사용하는 방입니다.");
+  ROOM_OPTIONS.forEach((room) => addCard({ room, data: roomSummaries?.[room.id] || {}, type: "bingo" }));
+
+  addGroupTitle("BATTLE ROOM", "대결 방", "숫자빙고를 2팀 또는 3팀으로 진행하는 송출용 대결방입니다.");
+  BATTLE_ROOM_OPTIONS.forEach((room) => addCard({ room, data: battleRoomSummaries?.[room.id] || {}, type: "battle" }));
 }
 
 function getContentTypeLabel(type) {
@@ -1387,7 +1465,7 @@ function getNumberDigitClass(value) {
 function render() {
   if (!activeRoomId) {
     renderRoomCards();
-    if (els.pageTitle) els.pageTitle.textContent = "빙고 방 선택";
+    if (els.pageTitle) els.pageTitle.textContent = "방 선택";
     return;
   }
 
@@ -1886,6 +1964,583 @@ function applyObsScale(value) {
     const scale = Number(button.dataset.obsScale || 1);
     button.classList.toggle("active", Math.abs(scale - obsScale) < 0.01);
   });
+}
+
+
+/* Battle number-bingo rooms */
+const battleStateDefaults = {
+  roomId: "",
+  roomName: "",
+  accessCode: "",
+  createdAt: 0,
+  updatedAt: 0,
+  battle: {
+    title: "숫자빙고 대결",
+    playerCount: 2,
+    size: 5,
+    players: []
+  }
+};
+
+function makeInitialBattleState(roomId = activeBattleRoomId) {
+  const base = structuredClone(battleStateDefaults);
+  base.roomId = roomId || "";
+  base.roomName = roomId ? getBattleRoomLabel(roomId) : "";
+  base.battle.players = buildBattlePlayers(2, 5);
+  return normalizeBattleState(base);
+}
+
+function normalizeBattleState(raw) {
+  const playerCount = [2, 3].includes(Number(raw?.battle?.playerCount)) ? Number(raw.battle.playerCount) : 2;
+  const size = NUMBER_BINGO_SIZES.includes(Number(raw?.battle?.size)) ? Number(raw.battle.size) : 5;
+  const total = size * size;
+  const rawPlayers = Array.isArray(raw?.battle?.players) ? raw.battle.players : [];
+  const players = Array.from({ length: playerCount }, (_, index) => {
+    const source = rawPlayers[index] || {};
+    const numbers = Array.isArray(source.numbers) && source.numbers.length === total
+      ? source.numbers.map((value) => String(value))
+      : makeBattleNumberTexts(total, size);
+    const checked = Array.isArray(source.checked) && source.checked.length === total
+      ? source.checked.map(Boolean)
+      : Array.from({ length: total }, () => false);
+    return {
+      id: source.id || `p${index + 1}`,
+      name: String(source.name || `팀 ${index + 1}`),
+      numbers,
+      checked,
+      chicken: Math.max(0, Number(source.chicken || 0))
+    };
+  });
+
+  return {
+    ...battleStateDefaults,
+    ...raw,
+    roomId: String(raw?.roomId || activeBattleRoomId || ""),
+    roomName: String(raw?.roomName || getBattleRoomLabel(activeBattleRoomId)),
+    accessCode: String(raw?.accessCode || ""),
+    createdAt: Number(raw?.createdAt || 0),
+    updatedAt: Number(raw?.updatedAt || 0),
+    battle: {
+      title: String(raw?.battle?.title || "숫자빙고 대결"),
+      playerCount,
+      size,
+      players
+    }
+  };
+}
+
+function prepareBattleStateForStorage(state) {
+  return {
+    ...state,
+    roomId: state.roomId || activeBattleRoomId || "",
+    roomName: state.roomName || getBattleRoomLabel(activeBattleRoomId),
+    accessCode: state.accessCode || currentBattleState.accessCode || "",
+    updatedAt: Date.now()
+  };
+}
+
+function makeBattleNumberTexts(count, size) {
+  if (size === 10 && count === 100) {
+    return Array.from({ length: 100 }, (_, index) => String(index + 1));
+  }
+  return makeRandomNumberTexts(count);
+}
+
+function buildBattlePlayers(playerCount, size, oldPlayers = []) {
+  const total = size * size;
+  return Array.from({ length: playerCount }, (_, index) => ({
+    id: `p${index + 1}`,
+    name: oldPlayers[index]?.name || `팀 ${index + 1}`,
+    numbers: makeBattleNumberTexts(total, size),
+    checked: Array.from({ length: total }, () => false),
+    chicken: Math.max(0, Number(oldPlayers[index]?.chicken || 0))
+  }));
+}
+
+function computeBattleStats(player, size) {
+  const total = size * size;
+  const checkedCount = player.checked.filter(Boolean).length;
+  const percent = total ? Math.round((checkedCount / total) * 100) : 0;
+  const completedLines = computeCompletedLines(player.checked.map((checked, index) => ({ id: `cell_${index}`, cleared: checked })), size);
+  return { total, checkedCount, percent, bingoCount: Object.keys(completedLines).length, completedLines };
+}
+
+function getBattleLineCoords(line, size) {
+  return getLineCoords(line, size);
+}
+
+async function createOrResetBattleRoom(roomId) {
+  const room = BATTLE_ROOM_OPTIONS.find((item) => item.id === roomId);
+  if (!room) return;
+
+  const alreadyExists = Boolean(battleRoomSummaries?.[roomId]?.accessCode);
+  const approved = await requestRoomAdminApproval(room.label, alreadyExists);
+  if (!approved) return;
+  if (alreadyExists && !confirm(`${room.label}이 이미 있습니다. 새 입장 코드로 초기화할까요? 기존 대결 데이터가 초기화됩니다.`)) return;
+
+  const code = generateRoomCode();
+  const fresh = makeInitialBattleState(roomId);
+  fresh.roomId = roomId;
+  fresh.roomName = room.label;
+  fresh.accessCode = code;
+  fresh.createdAt = Date.now();
+  fresh.updatedAt = Date.now();
+
+  try {
+    if (isFirebaseEnabled && db) {
+      await set(ref(db, `${BATTLE_ROOMS_PATH}/${roomId}`), prepareBattleStateForStorage(fresh));
+    } else {
+      localStorage.setItem(getBattleLocalStorageKey(roomId), JSON.stringify(fresh));
+    }
+    storeBattleRoomCode(roomId, code);
+    alert(`${room.label} 생성 완료!\n입장 코드: ${code}`);
+    location.href = `?battleRoom=${encodeURIComponent(roomId)}&view=public`;
+  } catch (error) {
+    console.error("대결방 생성 실패", error);
+    alert("대결방 생성에 실패했습니다. Firebase Rules 또는 DB 연결을 확인해 주세요.");
+  }
+}
+
+function promptEnterBattleRoom(roomId, view = "public") {
+  const room = battleRoomSummaries?.[roomId];
+  const label = getBattleRoomLabel(roomId);
+  if (!room?.accessCode) {
+    alert("아직 생성되지 않은 대결방입니다. 먼저 방 생성을 해주세요.");
+    return;
+  }
+  const cached = getStoredBattleRoomCode(roomId);
+  if (cached && cached === String(room.accessCode)) {
+    location.href = `?battleRoom=${encodeURIComponent(roomId)}&view=${encodeURIComponent(view)}`;
+    return;
+  }
+  const code = prompt(`${label} 입장 코드 5자리를 입력해 주세요.`);
+  if (code == null) return;
+  if (String(code).trim() !== String(room.accessCode)) {
+    alert("입장 코드가 맞지 않습니다.");
+    return;
+  }
+  storeBattleRoomCode(roomId, String(code).trim());
+  location.href = `?battleRoom=${encodeURIComponent(roomId)}&view=${encodeURIComponent(view)}`;
+}
+
+async function initBattle() {
+  setupBattleView();
+  bindBattleEvents();
+  setupBattleFirebaseIfAvailable();
+  await loadInitialBattleState();
+  renderBattle();
+}
+
+function setupBattleView() {
+  document.body.classList.toggle("view-battle", true);
+  document.body.classList.toggle("view-battle-obs", activeView === "battleObs");
+  document.body.classList.toggle("view-public", activeView !== "battleObs");
+  document.body.classList.toggle("view-obs", false);
+  if (els.homeScreen) els.homeScreen.hidden = true;
+  if (els.memoOpenBtn) els.memoOpenBtn.hidden = true;
+  if (els.adminToggleRow) els.adminToggleRow.hidden = activeView === "battleObs";
+  if (els.adminToggle) els.adminToggle.textContent = "관리자 패널 접기";
+  if (els.pageTitle) els.pageTitle.textContent = getBattleRoomLabel(activeBattleRoomId);
+
+  const nav = document.querySelector(".view-tabs");
+  if (nav) {
+    nav.innerHTML = `
+      <a href="?battleRoom=${encodeURIComponent(activeBattleRoomId)}&view=public" class="${activeView !== "battleObs" ? "active" : ""}">대결 관리</a>
+      <a href="?battleRoom=${encodeURIComponent(activeBattleRoomId)}&view=battleObs" class="${activeView === "battleObs" ? "active" : ""}">송출용</a>
+    `;
+  }
+
+  const layout = document.querySelector(".layout");
+  if (!layout) return;
+  layout.hidden = false;
+  layout.innerHTML = `
+    <aside class="admin-panel battle-admin-panel" id="battleAdminPanel" ${activeView === "battleObs" ? "hidden" : ""}>
+      <section class="panel-card">
+        <div class="panel-head"><h2>방 권한</h2><span id="battleLoginStatus" class="status-pill">확인 중</span></div>
+        <div class="login-box room-info-box">
+          <div class="room-info-line"><span>현재 방</span><strong id="battleCurrentRoomName">-</strong></div>
+          <div class="room-info-line"><span>입장 코드</span><strong id="battleCurrentRoomCode">-</strong></div>
+          <div class="row-buttons"><button id="battleCopyCodeBtn" class="primary-btn" type="button">코드 복사</button><button id="battleLeaveRoomBtn" class="ghost-btn" type="button">방 나가기</button></div>
+        </div>
+      </section>
+      <section class="panel-card battle-admin-only" data-battle-admin-only>
+        <div class="panel-head"><h2>대결 생성</h2><span class="status-pill">숫자 전용</span></div>
+        <label>대결 제목<input id="battleTitleInput" type="text" maxlength="40" /></label>
+        <div class="two-col">
+          <label>참가 팀 수<select id="battlePlayerCountSelect"><option value="2">2팀</option><option value="3">3팀</option></select></label>
+          <label>빙고 크기<select id="battleSizeSelect"><option value="5">5 × 5</option><option value="7">7 × 7</option><option value="10">10 × 10</option></select></label>
+        </div>
+        <div class="row-buttons wrap"><button id="battleSaveSettingsBtn" class="primary-btn" type="button">설정 저장</button><button id="battleGenerateBtn" class="ghost-btn" type="button">대결판 새로 생성</button></div>
+        <p class="help-text">5×5/7×7은 팀별 랜덤 숫자판, 10×10은 모든 팀이 1~100 순서판으로 생성됩니다.</p>
+      </section>
+      <section class="panel-card battle-admin-only" data-battle-admin-only>
+        <div class="panel-head"><h2>참가자 설정</h2></div>
+        <div id="battlePlayerNameInputs"></div>
+        <button id="battleSaveNamesBtn" class="primary-btn" type="button">팀 이름 저장</button>
+      </section>
+      <section class="panel-card battle-admin-only" data-battle-admin-only>
+        <div class="panel-head"><h2>치킨 수</h2></div>
+        <div id="battleChickenControls" class="battle-chicken-controls"></div>
+      </section>
+      <section class="panel-card battle-admin-only" data-battle-admin-only>
+        <div class="panel-head"><h2>전체 관리</h2></div>
+        <div class="row-buttons wrap"><button id="battleResetChecksBtn" class="ghost-btn danger-soft" type="button">체크 전체 초기화</button><button id="battleHardResetBtn" class="danger-btn" type="button">대결방 전체 초기화</button></div>
+      </section>
+    </aside>
+    <section class="stage battle-stage" id="battleStage">
+      <div class="board-title-block battle-title-block"><p class="board-kicker">NUMBER BATTLE</p><h2 id="battleTitleText">숫자빙고 대결</h2></div>
+      <div id="battleTeamTabs" class="battle-team-tabs"></div>
+      <div id="battlePlayerView" class="battle-player-view"></div>
+    </section>
+    <aside class="obs-scale-panel" id="battleObsScalePanel" aria-label="송출용 화면 확대 축소" ${activeView === "battleObs" ? "" : "hidden"}>
+      <p>OBS 비율</p>
+      <button type="button" data-battle-obs-scale="1">100%</button>
+      <button type="button" data-battle-obs-scale="0.8">80%</button>
+      <button type="button" data-battle-obs-scale="0.67">67%</button>
+      <button type="button" data-battle-obs-scale="0.5">50%</button>
+    </aside>
+  `;
+
+  applyObsScale(obsScale);
+}
+
+function bindBattleEvents() {
+  document.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!target) return;
+
+    if (target.id === "battleCopyCodeBtn") {
+      const code = currentBattleState.accessCode || "";
+      if (!code) return;
+      try { await navigator.clipboard.writeText(code); alert("입장 코드를 복사했어요."); }
+      catch { prompt("입장 코드를 복사하세요.", code); }
+    }
+
+    if (target.id === "battleLeaveRoomBtn") {
+      clearBattleRoomCode(activeBattleRoomId);
+      location.href = "./";
+    }
+
+    if (target.id === "battleSaveSettingsBtn") saveBattleSettings(false);
+    if (target.id === "battleGenerateBtn") saveBattleSettings(true);
+    if (target.id === "battleSaveNamesBtn") saveBattleNames();
+    if (target.id === "battleResetChecksBtn") resetBattleChecks();
+    if (target.id === "battleHardResetBtn") hardResetBattleRoom();
+
+    const tab = target.closest?.("[data-battle-team-tab]");
+    if (tab) {
+      battleActiveTeamIndex = Number(tab.dataset.battleTeamTab || 0);
+      renderBattle();
+    }
+
+    const cell = target.closest?.("[data-battle-cell]");
+    if (cell && activeView !== "battleObs") {
+      const playerIndex = Number(cell.dataset.playerIndex);
+      const cellIndex = Number(cell.dataset.battleCell);
+      toggleBattleCell(playerIndex, cellIndex);
+    }
+
+    const chickenButton = target.closest?.("[data-battle-chicken]");
+    if (chickenButton) {
+      updateBattleChicken(Number(chickenButton.dataset.playerIndex), Number(chickenButton.dataset.battleChicken));
+    }
+
+    const scaleButton = target.closest?.("[data-battle-obs-scale]");
+    if (scaleButton) {
+      const scale = Number(scaleButton.dataset.battleObsScale || 1);
+      applyObsScale(scale);
+      localStorage.setItem(OBS_SCALE_STORAGE_KEY, String(scale));
+      renderBattleObsScaleButtons();
+    }
+  });
+}
+
+function setupBattleFirebaseIfAvailable() {
+  if (!isFirebaseEnabled) return;
+  firebaseApp = initializeApp(firebaseConfig);
+  db = getDatabase(firebaseApp);
+  auth = getAuth(firebaseApp);
+  battleRoomsRef = ref(db, BATTLE_ROOMS_PATH);
+  battleRoomRef = ref(db, `${BATTLE_ROOMS_PATH}/${activeBattleRoomId}`);
+
+  onValue(battleRoomRef, (snapshot) => {
+    if (!snapshot.exists()) {
+      alert("아직 생성되지 않은 대결방입니다. 방 선택 화면으로 이동합니다.");
+      location.href = "./";
+      return;
+    }
+    currentBattleState = normalizeBattleState(snapshot.val());
+    updateBattleAccessState();
+    renderBattle();
+  }, (error) => {
+    console.error("대결방 Firebase 수신 실패", error);
+  });
+}
+
+async function loadInitialBattleState() {
+  if (isFirebaseEnabled) {
+    try {
+      const snapshot = await get(battleRoomRef);
+      currentBattleState = snapshot.exists() ? normalizeBattleState(snapshot.val()) : makeInitialBattleState(activeBattleRoomId);
+      updateBattleAccessState();
+    } catch (error) {
+      console.error("대결방 초기 불러오기 실패", error);
+      currentBattleState = makeInitialBattleState(activeBattleRoomId);
+      updateBattleAccessState();
+    }
+    return;
+  }
+
+  const saved = localStorage.getItem(getBattleLocalStorageKey(activeBattleRoomId));
+  currentBattleState = saved ? normalizeBattleState(JSON.parse(saved)) : makeInitialBattleState(activeBattleRoomId);
+  updateBattleAccessState();
+}
+
+function updateBattleAccessState() {
+  isBattleAdmin = activeView === "battleObs" || Boolean(currentBattleState.accessCode && getStoredBattleRoomCode(activeBattleRoomId) === String(currentBattleState.accessCode));
+  if (activeView !== "battleObs" && !isBattleAdmin) {
+    setTimeout(() => {
+      const code = prompt(`${getBattleRoomLabel(activeBattleRoomId)} 입장 코드 5자리를 입력해 주세요.`);
+      if (code && String(code).trim() === String(currentBattleState.accessCode || "")) {
+        storeBattleRoomCode(activeBattleRoomId, String(code).trim());
+        updateBattleAccessState();
+        renderBattle();
+      } else {
+        alert("입장 코드가 맞지 않습니다.");
+        location.href = "./";
+      }
+    }, 0);
+  }
+}
+
+function renderBattle() {
+  if (!activeBattleRoomId) return;
+  const battle = currentBattleState.battle;
+  const players = battle.players || [];
+  const size = battle.size || 5;
+  battleActiveTeamIndex = Math.max(0, Math.min(players.length - 1, battleActiveTeamIndex));
+
+  document.documentElement.style.setProperty("--battle-cell-size", String(size));
+  document.body.classList.toggle("battle-size-10", size === 10);
+  document.body.classList.toggle("battle-size-7", size === 7);
+  document.body.classList.toggle("battle-size-5", size === 5);
+
+  const titleText = document.getElementById("battleTitleText");
+  if (titleText) titleText.textContent = battle.title || "숫자빙고 대결";
+  if (els.pageTitle) els.pageTitle.textContent = currentBattleState.roomName || getBattleRoomLabel(activeBattleRoomId);
+
+  const loginStatus = document.getElementById("battleLoginStatus");
+  if (loginStatus) {
+    loginStatus.textContent = isBattleAdmin ? "방 입장 완료" : "입장 코드 필요";
+    loginStatus.classList.toggle("ok", isBattleAdmin);
+    loginStatus.classList.toggle("warn", !isBattleAdmin);
+  }
+  const roomName = document.getElementById("battleCurrentRoomName");
+  const roomCode = document.getElementById("battleCurrentRoomCode");
+  if (roomName) roomName.textContent = currentBattleState.roomName || getBattleRoomLabel(activeBattleRoomId);
+  if (roomCode) roomCode.textContent = currentBattleState.accessCode || "-";
+
+  document.querySelectorAll("[data-battle-admin-only]").forEach((node) => {
+    node.hidden = activeView === "battleObs" || !isBattleAdmin;
+  });
+
+  const titleInput = document.getElementById("battleTitleInput");
+  const countSelect = document.getElementById("battlePlayerCountSelect");
+  const sizeSelect = document.getElementById("battleSizeSelect");
+  if (titleInput && document.activeElement !== titleInput) titleInput.value = battle.title || "숫자빙고 대결";
+  if (countSelect) countSelect.value = String(battle.playerCount || 2);
+  if (sizeSelect) sizeSelect.value = String(size);
+
+  renderBattleTeamTabs(players);
+  renderBattlePlayerNameInputs(players);
+  renderBattleChickenControls(players);
+  renderBattlePlayerView(players[battleActiveTeamIndex], battleActiveTeamIndex);
+  renderBattleObsScaleButtons();
+}
+
+function renderBattleTeamTabs(players) {
+  const box = document.getElementById("battleTeamTabs");
+  if (!box) return;
+  box.innerHTML = players.map((player, index) => {
+    const stats = computeBattleStats(player, currentBattleState.battle.size);
+    return `<button type="button" data-battle-team-tab="${index}" class="${index === battleActiveTeamIndex ? "active" : ""}">${escapeHtml(player.name)} <span>${stats.percent}%</span></button>`;
+  }).join("");
+}
+
+function renderBattlePlayerNameInputs(players) {
+  const box = document.getElementById("battlePlayerNameInputs");
+  if (!box) return;
+  box.innerHTML = players.map((player, index) => `
+    <label>팀 ${index + 1} 이름<input data-battle-player-name="${index}" type="text" maxlength="20" value="${escapeHtml(player.name)}" /></label>
+  `).join("");
+}
+
+function renderBattleChickenControls(players) {
+  const box = document.getElementById("battleChickenControls");
+  if (!box) return;
+  box.innerHTML = players.map((player, index) => `
+    <div class="battle-chicken-row">
+      <strong>${escapeHtml(player.name)}</strong>
+      <button class="ghost-btn" type="button" data-player-index="${index}" data-battle-chicken="-1">-</button>
+      <span>🍗 ${Number(player.chicken || 0)}</span>
+      <button class="ghost-btn" type="button" data-player-index="${index}" data-battle-chicken="1">+</button>
+    </div>
+  `).join("");
+}
+
+function renderBattlePlayerView(player, playerIndex) {
+  const view = document.getElementById("battlePlayerView");
+  if (!view || !player) return;
+  const size = currentBattleState.battle.size;
+  const stats = computeBattleStats(player, size);
+  const opponents = currentBattleState.battle.players
+    .map((other, index) => ({ other, index, stats: computeBattleStats(other, size) }))
+    .filter((item) => item.index !== playerIndex);
+  const opponentHtml = opponents.length
+    ? opponents.map(({ other, stats }) => `<span>${escapeHtml(other.name)} ${stats.checkedCount}/${stats.total} · ${stats.percent}%</span>`).join("")
+    : `<span>상대 없음</span>`;
+
+  const cells = player.numbers.map((number, index) => {
+    const checked = Boolean(player.checked[index]);
+    return `<button type="button" data-player-index="${playerIndex}" data-battle-cell="${index}" class="battle-cell ${checked ? "checked" : ""} number-digit-${String(number).length}"><span>${escapeHtml(number)}</span></button>`;
+  }).join("");
+  const lines = Object.values(stats.completedLines).map((line) => {
+    const coords = getBattleLineCoords(line, size);
+    return `<line class="bingo-line" x1="${coords.x1}" y1="${coords.y1}" x2="${coords.x2}" y2="${coords.y2}"></line>`;
+  }).join("");
+
+  view.innerHTML = `
+    <div class="battle-player-card">
+      <div class="battle-player-head">
+        <div><p class="eyebrow">ACTIVE BOARD</p><h3>${escapeHtml(player.name)}</h3></div>
+        <div class="battle-progress-main"><strong>${stats.checkedCount}/${stats.total}</strong><span>진행률 ${stats.percent}%</span></div>
+      </div>
+      <div class="battle-opponents"><b>상대 진행률</b>${opponentHtml}</div>
+      <div class="battle-board-canvas">
+        <div class="battle-board-grid">${cells}</div>
+        <svg class="battle-line-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>
+      </div>
+      <div class="battle-score-strip">
+        <div class="score-box"><span class="score-label">BINGO</span><strong>${stats.bingoCount}</strong></div>
+        <div class="score-box chicken-box"><span class="score-label">🍗</span><strong>${Number(player.chicken || 0)}</strong></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderBattleObsScaleButtons() {
+  document.querySelectorAll("[data-battle-obs-scale]").forEach((button) => {
+    const scale = Number(button.dataset.battleObsScale || 1);
+    button.classList.toggle("active", Math.abs(scale - obsScale) < 0.01);
+  });
+}
+
+function requireBattleAdmin() {
+  if (!isBattleAdmin || activeView === "battleObs") {
+    alert("대결방 입장 후 수정할 수 있습니다.");
+    return false;
+  }
+  return true;
+}
+
+function saveBattleSettings(regenerate) {
+  if (!requireBattleAdmin()) return;
+  const title = String(document.getElementById("battleTitleInput")?.value || "숫자빙고 대결").trim() || "숫자빙고 대결";
+  const playerCount = Number(document.getElementById("battlePlayerCountSelect")?.value || 2);
+  const size = Number(document.getElementById("battleSizeSelect")?.value || 5);
+  if (regenerate && !confirm("대결판을 새로 생성하면 체크 상태가 초기화됩니다. 계속할까요?")) return;
+
+  commitBattleState((draft) => {
+    const oldPlayers = draft.battle.players || [];
+    const countChanged = Number(draft.battle.playerCount) !== playerCount;
+    const sizeChanged = Number(draft.battle.size) !== size;
+    draft.battle.title = title;
+    draft.battle.playerCount = [2, 3].includes(playerCount) ? playerCount : 2;
+    draft.battle.size = NUMBER_BINGO_SIZES.includes(size) ? size : 5;
+    if (regenerate || countChanged || sizeChanged) {
+      draft.battle.players = buildBattlePlayers(draft.battle.playerCount, draft.battle.size, oldPlayers);
+      battleActiveTeamIndex = 0;
+    }
+  });
+}
+
+function saveBattleNames() {
+  if (!requireBattleAdmin()) return;
+  const inputs = [...document.querySelectorAll("[data-battle-player-name]")];
+  commitBattleState((draft) => {
+    inputs.forEach((input) => {
+      const index = Number(input.dataset.battlePlayerName);
+      if (draft.battle.players[index]) draft.battle.players[index].name = String(input.value || `팀 ${index + 1}`).trim() || `팀 ${index + 1}`;
+    });
+  });
+}
+
+function toggleBattleCell(playerIndex, cellIndex) {
+  if (!requireBattleAdmin()) return;
+  commitBattleState((draft) => {
+    const player = draft.battle.players[playerIndex];
+    if (!player || typeof player.checked[cellIndex] === "undefined") return;
+    player.checked[cellIndex] = !player.checked[cellIndex];
+  });
+}
+
+function updateBattleChicken(playerIndex, delta) {
+  if (!requireBattleAdmin()) return;
+  commitBattleState((draft) => {
+    const player = draft.battle.players[playerIndex];
+    if (!player) return;
+    player.chicken = Math.max(0, Number(player.chicken || 0) + Number(delta || 0));
+  });
+}
+
+function resetBattleChecks() {
+  if (!requireBattleAdmin()) return;
+  if (!confirm("모든 팀의 체크를 초기화할까요?")) return;
+  commitBattleState((draft) => {
+    draft.battle.players.forEach((player) => {
+      player.checked = player.checked.map(() => false);
+    });
+  });
+}
+
+function hardResetBattleRoom() {
+  if (!requireBattleAdmin()) return;
+  if (!confirm("대결방을 기본 상태로 초기화할까요? 입장 코드는 유지됩니다.")) return;
+  commitBattleState((draft) => {
+    const code = draft.accessCode;
+    const createdAt = draft.createdAt;
+    const roomName = draft.roomName;
+    const fresh = makeInitialBattleState(activeBattleRoomId);
+    Object.assign(draft, fresh, { accessCode: code, createdAt, roomName });
+    battleActiveTeamIndex = 0;
+  });
+}
+
+async function commitBattleState(mutator) {
+  const before = normalizeBattleState(currentBattleState);
+  const draft = structuredClone(before);
+  mutator(draft);
+  await saveWholeBattleState(draft);
+}
+
+async function saveWholeBattleState(nextState) {
+  currentBattleState = normalizeBattleState(nextState);
+  renderBattle();
+  if (isFirebaseEnabled) {
+    if (!battleRoomRef) {
+      alert("대결방이 선택되지 않아 저장할 수 없습니다.");
+      return;
+    }
+    try {
+      currentBattleState.updatedAt = Date.now();
+      await set(battleRoomRef, prepareBattleStateForStorage(currentBattleState));
+    } catch (error) {
+      console.error("대결방 Firebase 저장 실패", error);
+      alert("Firebase 저장에 실패했습니다. Rules 권한을 확인해 주세요.");
+    }
+    return;
+  }
+  localStorage.setItem(getBattleLocalStorageKey(activeBattleRoomId), JSON.stringify(currentBattleState));
 }
 
 function setLoginStatus(text, mode) {
