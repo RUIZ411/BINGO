@@ -243,7 +243,20 @@ else init();
 async function init() {
   setupView();
   bindEvents();
-  setupFirebaseIfAvailable();
+
+  // 홈 화면은 Firebase 수신보다 먼저 기본 방 카드부터 렌더링합니다.
+  // DB Rules나 네트워크 문제로 battleRooms를 읽지 못해도 방 목록이 빈 화면으로 멈추지 않게 하기 위한 안전장치입니다.
+  if (!activeRoomId) renderRoomCards();
+
+  try {
+    setupFirebaseIfAvailable();
+  } catch (error) {
+    console.error("Firebase 초기화 실패", error);
+    isFirebaseEnabled = false;
+    setLoginStatus(activeRoomId ? "DB 연결 오류" : "로컬 모드", "warn");
+    if (!activeRoomId) renderRoomCards();
+  }
+
   await loadInitialState();
   render();
 }
@@ -260,10 +273,15 @@ function setupView() {
   $$('[data-view-link]').forEach((link) => {
     const viewName = link.dataset.viewLink;
     link.classList.toggle("active", !isHome && viewName === activeView);
-    if (!isHome && activeRoomId) {
+
+    // 홈/방 선택 버튼은 항상 방 목록으로 이동하게 합니다.
+    // 기존에는 방 안에서 "메인 화면"이 현재 방 public 화면으로 이동해 혼동이 있었습니다.
+    if (viewName === "home") {
+      link.href = "./";
+    } else if (!isHome && activeRoomId) {
       link.href = `?room=${encodeURIComponent(activeRoomId)}&view=${encodeURIComponent(viewName)}`;
     } else {
-      link.href = "#";
+      link.href = "./";
     }
   });
 
@@ -311,6 +329,10 @@ function setupFirebaseIfAvailable() {
 
   onValue(roomsRef, (snapshot) => {
     roomSummaries = snapshot.exists() ? snapshot.val() : {};
+    renderRoomCards();
+  }, (error) => {
+    console.warn("빙고방 목록 수신 실패", error);
+    roomSummaries = {};
     renderRoomCards();
   });
 
